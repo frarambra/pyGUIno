@@ -1,0 +1,25 @@
+<?xml version="1.0" enconding="UTF-8"?>
+<caracteristicas>
+	<meta>
+		<ui>Template</ui>
+	</meta>
+
+	<analogico>
+		<pin>A0</pin>
+	</analogico>
+	
+	<digital>
+	</digital>
+	
+	<pwm>
+		<pin>0</pin>
+	</pwm>
+	
+	<i2c>
+		<pin>0</pin>
+	</i2c>
+		
+	<serial>
+		<pin>0</pin>
+	</serial>
+</caracteristicas>

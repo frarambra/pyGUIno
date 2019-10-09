@@ -1,0 +1,6 @@
+.idea
+.pyc
+utils/__pycache__/
+resources/ui_files/
+venv/
+pruebas/
