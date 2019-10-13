@@ -1,66 +1,74 @@
+import os, json
 from PyQt5 import QtCore, QtGui, QtWidgets
-
+from utils.CustomWidgets import WidgetPlot
+from functools import partial
 
 class BaseApp:
     def __init__(self, mainwindow):
-        mainwindow.setObjectName("MainWindow")
         mainwindow.resize(800, 600)
+        mainwindow.setObjectName("MainWindow")
         self.centralwidget = QtWidgets.QWidget(MainWindow)
-        self.centralwidget.setObjectName("centralwidget")
         mainwindow.setCentralWidget(self.centralwidget)
+        self.centralwidget.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+
+        self.gridLayoutWidget = QtWidgets.QGridLayout(self.centralwidget)
+
         self.menubar = QtWidgets.QMenuBar(MainWindow)
         self.menubar.setGeometry(QtCore.QRect(0, 0, 800, 21))
-        self.menubar.setObjectName("menubar")
+
         self.menuArchivo = QtWidgets.QMenu(self.menubar)
-        self.menuArchivo.setObjectName("menuArchivo")
         self.menuConexion = QtWidgets.QMenu(self.menuArchivo)
-        self.menuConexion.setObjectName("menuConexion")
-        self.menuIP = QtWidgets.QMenu(self.menuConexion)
-        self.menuIP.setObjectName("menuIP")
+        self.menuBoards = QtWidgets.QMenu(self.menuArchivo)
+
         self.menuHerramientas = QtWidgets.QMenu(self.menubar)
-        self.menuHerramientas.setObjectName("menuHerramientas")
         self.menuLoggers = QtWidgets.QMenu(self.menuHerramientas)
-        self.menuLoggers.setObjectName("menuLoggers")
-        MainWindow.setMenuBar(self.menubar)
+        self.menuGraficas = QtWidgets.QMenu(self.menuHerramientas)
+
+        mainwindow.setMenuBar(self.menubar)
         self.statusbar = QtWidgets.QStatusBar(MainWindow)
-        self.statusbar.setObjectName("statusbar")
-        MainWindow.setStatusBar(self.statusbar)
+        mainwindow.setStatusBar(self.statusbar)
+
+        # Instanciamos los QAction
         self.actionNuevo = QtWidgets.QAction(MainWindow)
-        self.actionNuevo.setObjectName("actionNuevo")
         self.actionCargar = QtWidgets.QAction(MainWindow)
-        self.actionCargar.setObjectName("actionCargar")
         self.actionSerial = QtWidgets.QAction(MainWindow)
-        self.actionSerial.setObjectName("actionSerial")
         self.actionBluetooth = QtWidgets.QAction(MainWindow)
-        self.actionBluetooth.setObjectName("actionBluetooth")
-        self.actionTCP = QtWidgets.QAction(MainWindow)
-        self.actionTCP.setObjectName("actionTCP")
-        self.actionUDP = QtWidgets.QAction(MainWindow)
-        self.actionUDP.setObjectName("actionUDP")
-        self.actionGraficas = QtWidgets.QAction(MainWindow)
-        self.actionGraficas.setObjectName("actionGraficas")
+        self.actionIP = QtWidgets.QAction(MainWindow)
         self.actionComm = QtWidgets.QAction(MainWindow)
-        self.actionComm.setObjectName("actionComm")
         self.actionI2C = QtWidgets.QAction(MainWindow)
-        self.actionI2C.setObjectName("actionI2C")
         self.actionSPI = QtWidgets.QAction(MainWindow)
-        self.actionSPI.setObjectName("actionSPI")
         self.actionTabla = QtWidgets.QAction(MainWindow)
-        self.actionTabla.setObjectName("actionTabla")
-        self.menuIP.addAction(self.actionTCP)
-        self.menuIP.addAction(self.actionUDP)
+
+        # Hacemos que actuen a los triggers
+
+        # Añadimos lo QAction al menu boards
+        schemas = os.listdir("resources\\schemas")
+
+        for schema in schemas:
+            print("Opening {}".format(schema))
+            fd = open("resources\\schemas\\"+schema, 'r')
+            data = json.load(fd)
+
+            qaction = QtWidgets.QAction(MainWindow)
+            qaction.setText(data['meta']['ui'])
+            qaction.triggered.connect(partial(self.update_graphmenu, arg_data=data))
+            self.menuBoards.addAction(qaction)
+            fd.close()
+
         self.menuConexion.addAction(self.actionSerial)
         self.menuConexion.addAction(self.actionBluetooth)
-        self.menuConexion.addAction(self.menuIP.menuAction())
+        self.menuConexion.addAction(self.actionIP)
+
         self.menuArchivo.addAction(self.actionNuevo)
         self.menuArchivo.addAction(self.actionCargar)
         self.menuArchivo.addSeparator()
         self.menuArchivo.addAction(self.menuConexion.menuAction())
+        self.menuArchivo.addAction(self.menuBoards.menuAction())
         self.menuLoggers.addAction(self.actionComm)
         self.menuLoggers.addAction(self.actionI2C)
         self.menuLoggers.addAction(self.actionSPI)
-        self.menuHerramientas.addAction(self.actionGraficas)
         self.menuHerramientas.addAction(self.menuLoggers.menuAction())
+        self.menuHerramientas.addAction(self.menuGraficas.menuAction())
         self.menuHerramientas.addAction(self.actionTabla)
         self.menubar.addAction(self.menuArchivo.menuAction())
         self.menubar.addAction(self.menuHerramientas.menuAction())
@@ -68,25 +76,38 @@ class BaseApp:
         self.retranslate_ui(mainwindow)
         QtCore.QMetaObject.connectSlotsByName(mainwindow)
 
+        # Pruebas
+#        self.pruebaPlot = None
+#        self.test()
+
+    # def test(self):
+        # self.pruebaPlot = WidgetPlot()
+        # self.pruebaPlot.setObjectName("plot")
+        # self.gridLayoutWidget.addWidget(self.pruebaPlot, 0, 0, 1, 1)
+
     def retranslate_ui(self, mainwindow):
         _translate = QtCore.QCoreApplication.translate
         mainwindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
         self.menuArchivo.setTitle(_translate("MainWindow", "Archivo"))
         self.menuConexion.setTitle(_translate("MainWindow", "Conexion"))
-        self.menuIP.setTitle(_translate("MainWindow", "IP"))
+        self.menuBoards.setTitle(_translate("MainWindow", "Boards"))
+        self.actionIP.setText(_translate("MainWindow", "IP"))
         self.menuHerramientas.setTitle(_translate("MainWindow", "Herramientas"))
         self.menuLoggers.setTitle(_translate("MainWindow", "Loggers"))
+        self.menuGraficas.setTitle(_translate("MainWindow", "Graficas"))
         self.actionNuevo.setText(_translate("MainWindow", "Nuevo"))
         self.actionCargar.setText(_translate("MainWindow", "Cargar"))
         self.actionSerial.setText(_translate("MainWindow", "Serial"))
         self.actionBluetooth.setText(_translate("MainWindow", "Bluetooth"))
-        self.actionTCP.setText(_translate("MainWindow", "TCP"))
-        self.actionUDP.setText(_translate("MainWindow", "UDP"))
-        self.actionGraficas.setText(_translate("MainWindow", "Graficas"))
         self.actionComm.setText(_translate("MainWindow", "Comm"))
         self.actionI2C.setText(_translate("MainWindow", "I2C"))
         self.actionSPI.setText(_translate("MainWindow", "SPI"))
         self.actionTabla.setText(_translate("MainWindow", "Tabla"))
+
+    def update_graphmenu(self, arg_data):
+        # El input son los datos de la placa guardados en .json
+        # Hay que actualizar los menus:
+        print(arg_data)
 
 
 if __name__ == "__main__":
@@ -94,5 +115,6 @@ if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
     MainWindow = QtWidgets.QMainWindow()
     baseapp = BaseApp(mainwindow=MainWindow)
+
     MainWindow.show()
     sys.exit(app.exec_())

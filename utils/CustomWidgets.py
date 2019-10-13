@@ -14,6 +14,8 @@ class WidgetPlot(QWidget):
     def __init__(self, *args, **kwargs):
         QWidget.__init__(self, *args, **kwargs)
 
+        # TODO: Cambiar esto es filler y temporal
+
         base = QVBoxLayout()
         self.setLayout(base)
 
@@ -33,7 +35,6 @@ class WidgetPlot(QWidget):
         # Estilos
         self.nombreGrafica.setText('Prueba')
         self.nombreGrafica.setMargin(15)
-        # self.nombreGrafica.setFont(QtGui.QFont("Comic Sans", 12, QtGui.QFont.Bold))
 
         self._dynamic_ax = self.dynamic_canvas.figure.subplots()
         self._timer = self.dynamic_canvas.new_timer(
@@ -41,27 +42,44 @@ class WidgetPlot(QWidget):
         self._timer.start()
 
     def _update_canvas(self):
+        # timestamp = args['timestamp']
+        # pin = args['pin']
+        # value = args['value']
+
         self._dynamic_ax.clear()
         t = np.linspace(0, 10, 101)
         # Aqui se deberian obtener los datos del arduino
         self._dynamic_ax.plot(t, np.sin(t + time.time()))
         self._dynamic_ax.figure.canvas.draw()
-        self._timer.stop()
+
+    def new_data(self, data):
+        # Estructura de datos PIN | dato | timestamp
+        ts = data['timestamp']
+        pin = data['pin']
+        value = data['value']
+
+        if ts or pin or value is None:
+            return
+        else:
+            # TODO: actualizar aquellos plots que requieran los datos
+            pass
 
 
 '''
     Las siguiente clase tiene como objetivo crear un logger funcional con el 
-    objetivo de poder mostrar informacion de todo tipo, ya sea lo que pase por el serial
+    objetivo de poder mostrar informacion de cualquier tipo, ya sea lo que pase por el serial
     o algun protocolo especifico
 '''
 
 
 class CustomLogger(QWidget, logging.Handler):
-    def __init__(self, *args, **kwargs):
-        QWidget.__init__(self, *args, **kwargs)
+    def __init__(self, tipo, parent):
+        QWidget.__init__(self, parent=parent)
+        self.needed_resources = []
+
         logging.Handler.__init__(self)
-        logging.getLogger().addHandler(self)
-        logging.getLogger().setLevel(logging.INFO)
+        log = logging.getLogger(tipo)
+        log.addHandler(self)
 
         base = QVBoxLayout()
         self.setLayout(base)
@@ -72,24 +90,24 @@ class CustomLogger(QWidget, logging.Handler):
 
         # Miscelanea
         self.title = QLabel()
-        self.title.setText('Pruebas de logging')
+        self.title.setText(tipo+" Logger")
         self.button = QPushButton()
-        self.button.setText('Crear texto del logger')
         self.button.clicked.connect(self.click_event)
+        self.button.setText('Cerrar')
 
         # Añadimos todas las cosas para que quede bonito
         self.layout().addWidget(self.title)
         self.layout().addWidget(self.button)
         self.layout().addWidget(self.loggerText)
-        print('Objeto instanciado')
-
-    @pyqtSlot()
-    def click_event(self):
-        print('click_event ejecutado')
-        text = 'Prueba a las {}'.format(time.time())
-        logging.info(text)
 
     def emit(self, record):
         msg = 'Contenido del mensaje:\n{}'.format(self.format(record))
         print(msg)
         self.loggerText.appendPlainText(msg)
+
+    # TODO: Borrar esto, solo es temporal
+    @pyqtSlot()
+    def click_event(self):
+        print('click_event ejecutado')
+        text = 'Prueba a las {}'.format(time.time())
+        logging.info(text)

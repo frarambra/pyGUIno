@@ -1,0 +1,10 @@
+{
+  "meta": {
+    "ui": "Arduino fake"
+  },
+  "analogico": ["A0", "A3", "A4", "A5"],
+  "digital": [0,1,2,3,4,5,12],
+  "pwm":  [3,11],
+  "i2c":  ["A4"],
+  "serial": [0]
+}
