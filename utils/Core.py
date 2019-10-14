@@ -1,11 +1,9 @@
 from utils import communication, CustomWidgets
 import logging
-import asyncio
-
 
 class Core:
     def __init__(self, layout, type_comm, comm_args, list_widgets):
-        self.non_free_spots = [(0,1),(1,0),(1,1)]
+        self.non_free_spots = []
         # Procedemos a iniciar la comunicacion
         self.layout = layout
         if type_comm is not None:
@@ -56,17 +54,15 @@ class Core:
         self.layout.addWidget(plt_widget, cord_x, cord_y, 1, 1)
 
     def manage_layout(self):
-        if self.non_free_spots is []:
-            return 0, 1
+        if self.non_free_spots==[]:
+            x = 0
+            y = 0
+        # si el segundo elemento de la lista es 0
+        elif self.non_free_spots[-1][1]==0:
+            x = self.non_free_spots[-1][0]  # La x deberia mantenerse
+            y = self.non_free_spots[-1][1]+1  # La y deberia ser 1
         else:
-            x = []
-            y = []
-            for (temp1, temp2) in self.non_free_spots:
-                x.append(temp1)
-                y.append(temp2)
-            if min(x) <= min(y):
-                self.non_free_spots.append((min(x)+1, min(y)))
-                return min(x)+1, min(y)
-            else:
-                self.non_free_spots.append((min(x), min(y)+1))
-                return min(x), min(y)+1
+            x = self.non_free_spots[-1][0]+1  # x deberia aumentarse
+            y = 0 # La y deberia ser 0
+        self.non_free_spots.append((x, y))
+        return x, y

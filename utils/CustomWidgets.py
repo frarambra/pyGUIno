@@ -50,10 +50,8 @@ class WidgetPlot(QWidget):
         t = np.linspace(0, 10, 101)
         # Aqui se deberian obtener los datos del arduino
         self._dynamic_ax.plot(t, np.sin(t + time.time()))
-        print("Procedemos a realizar draw()")
         self._dynamic_ax.figure.canvas.draw()
         # self._timer.stop()
-        print("draw() ejecutado")
 
     def new_data(self, data):
         # Estructura de datos PIN | dato | timestamp
