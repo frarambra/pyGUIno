@@ -11,14 +11,14 @@ import logging
 
 
 class WidgetPlot(QWidget):
-    def __init__(self, *args, **kwargs):
-        QWidget.__init__(self, *args, **kwargs)
-
-        # TODO: Cambiar esto es filler y temporal
+    def __init__(self, pin):
+        QWidget.__init__(self)
+        # TODO: Cambiar esto es filler y temporal, deberia haber multiples instancias para un mismo pin?
+        # haria falta un formulario para escoger la posicion en el grid o bastaria con un "drag and drop"
+        self.pin = pin
 
         base = QVBoxLayout()
         self.setLayout(base)
-
         # Las canvas de matplotplib
         fig = Figure(figsize=(10, 8))
         FigureCanvas.setSizePolicy(self, QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -33,13 +33,13 @@ class WidgetPlot(QWidget):
         self.layout().addWidget(self.dynamic_canvas)
 
         # Estilos
-        self.nombreGrafica.setText('Prueba')
+        self.nombreGrafica.setText('Grafica '+pin)
         self.nombreGrafica.setMargin(15)
 
         self._dynamic_ax = self.dynamic_canvas.figure.subplots()
-        self._timer = self.dynamic_canvas.new_timer(
-            100, [(self._update_canvas, (), {})])
-        self._timer.start()
+        self._update_canvas()
+        # self._timer = self.dynamic_canvas.new_timer(100, [(self._update_canvas, (), {})])
+        # self._timer.start()
 
     def _update_canvas(self):
         # timestamp = args['timestamp']
@@ -50,7 +50,10 @@ class WidgetPlot(QWidget):
         t = np.linspace(0, 10, 101)
         # Aqui se deberian obtener los datos del arduino
         self._dynamic_ax.plot(t, np.sin(t + time.time()))
+        print("Procedemos a realizar draw()")
         self._dynamic_ax.figure.canvas.draw()
+        # self._timer.stop()
+        print("draw() ejecutado")
 
     def new_data(self, data):
         # Estructura de datos PIN | dato | timestamp

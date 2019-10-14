@@ -1,7 +1,10 @@
-import os, json
+import sys
+import os
+import json
+from utils import Core
 from PyQt5 import QtCore, QtGui, QtWidgets
-from utils.CustomWidgets import WidgetPlot
 from functools import partial
+
 
 class BaseApp:
     def __init__(self, mainwindow):
@@ -45,10 +48,8 @@ class BaseApp:
         schemas = os.listdir("resources\\schemas")
 
         for schema in schemas:
-            print("Opening {}".format(schema))
             fd = open("resources\\schemas\\"+schema, 'r')
             data = json.load(fd)
-
             qaction = QtWidgets.QAction(MainWindow)
             qaction.setText(data['meta']['ui'])
             qaction.triggered.connect(partial(self.update_graphmenu, arg_data=data))
@@ -76,14 +77,8 @@ class BaseApp:
         self.retranslate_ui(mainwindow)
         QtCore.QMetaObject.connectSlotsByName(mainwindow)
 
-        # Pruebas
-#        self.pruebaPlot = None
-#        self.test()
-
-    # def test(self):
-        # self.pruebaPlot = WidgetPlot()
-        # self.pruebaPlot.setObjectName("plot")
-        # self.gridLayoutWidget.addWidget(self.pruebaPlot, 0, 0, 1, 1)
+        # Una vez creado todas las toolbars, procedemos a crear el core
+        self.core = Core.Core(layout=self.gridLayoutWidget, type_comm=None, comm_args=None, list_widgets=None)
 
     def retranslate_ui(self, mainwindow):
         _translate = QtCore.QCoreApplication.translate
@@ -107,11 +102,16 @@ class BaseApp:
     def update_graphmenu(self, arg_data):
         # El input son los datos de la placa guardados en .json
         # Hay que actualizar los menus:
-        print(arg_data)
+        for pin in arg_data['analogico']:
+            # TODO: Vaciar y entonces añadir pines
+            qaction = QtWidgets.QAction(MainWindow)
+            qaction.setText('Pin '+pin)
+            self.menuGraficas.addAction(qaction)
+            qaction.triggered.connect(partial(self.core.create_plot_widget, pin=pin))
 
 
 if __name__ == "__main__":
-    import sys
+
     app = QtWidgets.QApplication(sys.argv)
     MainWindow = QtWidgets.QMainWindow()
     baseapp = BaseApp(mainwindow=MainWindow)
