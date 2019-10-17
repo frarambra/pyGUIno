@@ -21,6 +21,7 @@ class BaseApp:
 
         self.menuArchivo = QtWidgets.QMenu(self.menubar)
         self.menuConexion = QtWidgets.QMenu(self.menuArchivo)
+        self.connForm = None
         self.menuBoards = QtWidgets.QMenu(self.menuArchivo)
 
         self.menuHerramientas = QtWidgets.QMenu(self.menubar)
@@ -42,9 +43,9 @@ class BaseApp:
         self.actionSPI = QtWidgets.QAction(MainWindow)
         self.actionTabla = QtWidgets.QAction(MainWindow)
 
-        # Hacemos que actuen a los triggers
-
-        # Añadimos lo QAction al menu boards
+        # Añadimos los triggers
+        self.actionSerial.triggered.connect(partial(self.set_connform, selected="Serial"))
+        self.actionIP.triggered.connect(partial(self.set_connform, selected="WiFi"))
         schemas = os.listdir("resources\\schemas")
 
         for schema in schemas:
@@ -78,7 +79,12 @@ class BaseApp:
         QtCore.QMetaObject.connectSlotsByName(mainwindow)
 
         # Una vez creado todas las toolbars, procedemos a crear el core
-        self.core = Core.Core(layout=self.gridLayoutWidget, type_comm=None, comm_args=None, list_widgets=None)
+        self.core = Core.Core(layout=self.gridLayoutWidget, comm_args=None, list_widgets=None)
+
+        # Hacemos que actuen a los triggers para loggers
+        self.actionI2C.triggered.connect(partial(self.core.create_logger_widget, log_id='I2C'))
+        self.actionSPI.triggered.connect(partial(self.core.create_logger_widget, log_id='SPI'))
+        self.actionComm.triggered.connect(partial(self.core.create_logger_widget, log_id='COM'))
 
     def retranslate_ui(self, mainwindow):
         _translate = QtCore.QCoreApplication.translate
@@ -108,6 +114,59 @@ class BaseApp:
             qaction.setText('Pin '+pin)
             self.menuGraficas.addAction(qaction)
             qaction.triggered.connect(partial(self.core.create_plot_widget, pin=pin))
+
+    def set_connform(self, selected):
+        self.connForm = ConnectionForm(selected)
+
+
+class ConnectionForm(QtWidgets.QDialog):
+    # Sera el formulario para realizar la conexion, sea cual sea
+    def __init__(self, selected):
+        # TODO: Comprobar datos de entrada y añadir las funciones a los botones
+        QtWidgets.QDialog.__init__(self)
+        self.buttonBox = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
+        self.dialogLayout = QtWidgets.QVBoxLayout()
+        self.formBox = QtWidgets.QGroupBox(selected)
+        formlayout = QtWidgets.QFormLayout()
+        self.mainLayout = QtWidgets.QVBoxLayout()
+        self.setWindowTitle("Conexion")
+
+        if selected == 'Serial':
+            self.qlabel1 = QtWidgets.QLabel(self.formBox)
+            self.qlabel2 = QtWidgets.QLabel(self.formBox)
+            self.qlabel1.setText('Serial')
+            self.qlabel2.setText('Baudrate')
+            self.i1 = QtWidgets.QLineEdit()
+            self.i2 = QtWidgets.QLineEdit()
+            formlayout.addRow(self.qlabel1, self.i1)
+            formlayout.addRow(self.qlabel2, self.i2)
+
+        elif selected == 'WiFi':
+            self.qlabel1 = QtWidgets.QLabel(self.formBox)
+            self.qlabel2 = QtWidgets.QLabel(self.formBox)
+            self.qlabel1.setText('IP')
+            self.qlabel2.setText('Puerto')
+            self.transport = QtWidgets.QComboBox()
+            self.transport.addItem("TCP")
+            self.transport.addItem("UDP")
+            self.i1 = QtWidgets.QLineEdit()
+            self.i2 = QtWidgets.QLineEdit()
+
+            formlayout.addRow(self.qlabel1, self.i1)
+            formlayout.addRow(self.transport)
+            formlayout.addRow(self.qlabel2, self.i2)
+
+        elif selected == 'Bluetooth':
+            pass
+
+        self.formBox.setLayout(formlayout)
+        self.mainLayout.addWidget(self.formBox)
+        self.mainLayout.addWidget(self.buttonBox)
+        self.setLayout(self.mainLayout)
+        self.show()
+
+    def validate_input(self):
+        pass
 
 
 if __name__ == "__main__":

@@ -1,15 +1,16 @@
-from utils import communication, CustomWidgets
+from utils import Communication, CustomWidgets
 import logging
 
+
 class Core:
-    def __init__(self, layout, type_comm, comm_args, list_widgets):
+    def __init__(self, layout, comm_args, list_widgets):
         self.non_free_spots = []
         # Procedemos a iniciar la comunicacion
         self.layout = layout
-        if type_comm is not None:
-            self.comm = self.set_comm(type_comm, comm_args)
+        if comm_args:
+            self.comm = Communication.AbstractCommunication(comm_args)
         # Iniciamos los loggers
-        self.logs = ['I2C', 'SPI', 'SERIAL']
+        self.logs = ['I2C', 'SPI', 'COM']
         # noinspection PyShadowingBuiltins
         for id in self.logs:
             log = logging.getLogger(id)
@@ -34,18 +35,15 @@ class Core:
             widget.new_data(data)
 
     @staticmethod
-    def set_comm(comm, args):
-        if comm == 'serial':
-            return communication.CommSerial(args)
-        elif comm == 'wifi':
-            return communication.CommWifi(args)
-        else:
-            return communication.CommBluetooth(args)
-
-    @staticmethod
     def logger_notify(name, data):
         log = logging.getLogger(name)
         log.info(data)
+
+    def create_logger_widget(self, log_id):
+        logger_widget = CustomWidgets.CustomLogger(log_id=log_id)
+        self.list_widgets.append(logger_widget)
+        (cord_x, cord_y) = self.manage_layout()
+        self.layout.addWidget(logger_widget, cord_x, cord_y, 1, 1)
 
     def create_plot_widget(self, pin):
         plt_widget = CustomWidgets.WidgetPlot(pin=pin)
@@ -54,15 +52,15 @@ class Core:
         self.layout.addWidget(plt_widget, cord_x, cord_y, 1, 1)
 
     def manage_layout(self):
-        if self.non_free_spots==[]:
+        if not self.non_free_spots:
             x = 0
             y = 0
         # si el segundo elemento de la lista es 0
-        elif self.non_free_spots[-1][1]==0:
-            x = self.non_free_spots[-1][0]  # La x deberia mantenerse
-            y = self.non_free_spots[-1][1]+1  # La y deberia ser 1
+        elif self.non_free_spots[-1][1] == 0:
+            x = self.non_free_spots[-1][0]
+            y = self.non_free_spots[-1][1]+1
         else:
-            x = self.non_free_spots[-1][0]+1  # x deberia aumentarse
-            y = 0 # La y deberia ser 0
+            x = self.non_free_spots[-1][0]+1
+            y = 0  # La y deberia ser 0
         self.non_free_spots.append((x, y))
         return x, y

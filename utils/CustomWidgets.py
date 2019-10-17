@@ -38,8 +38,8 @@ class WidgetPlot(QWidget):
 
         self._dynamic_ax = self.dynamic_canvas.figure.subplots()
         self._update_canvas()
-        # self._timer = self.dynamic_canvas.new_timer(100, [(self._update_canvas, (), {})])
-        # self._timer.start()
+        self._timer = self.dynamic_canvas.new_timer(10, [(self._update_canvas, (), {})])
+        self._timer.start()
 
     def _update_canvas(self):
         # timestamp = args['timestamp']
@@ -49,7 +49,7 @@ class WidgetPlot(QWidget):
         self._dynamic_ax.clear()
         t = np.linspace(0, 10, 101)
         # Aqui se deberian obtener los datos del arduino
-        self._dynamic_ax.plot(t, np.sin(t + time.time()))
+        self._dynamic_ax.plot(t, 10*np.sin(t + time.time()))
         self._dynamic_ax.figure.canvas.draw()
         # self._timer.stop()
 
@@ -74,13 +74,13 @@ class WidgetPlot(QWidget):
 
 
 class CustomLogger(QWidget, logging.Handler):
-    def __init__(self, tipo, parent):
-        QWidget.__init__(self, parent=parent)
+    def __init__(self, log_id):
+        QWidget.__init__(self)
         self.needed_resources = []
 
         logging.Handler.__init__(self)
-        log = logging.getLogger(tipo)
-        log.addHandler(self)
+        self.log = logging.getLogger(log_id)
+        self.log.addHandler(self)
 
         base = QVBoxLayout()
         self.setLayout(base)
@@ -88,10 +88,12 @@ class CustomLogger(QWidget, logging.Handler):
         # Configuramos donde ira el texto del logger
         self.loggerText = QPlainTextEdit()
         self.loggerText.setReadOnly(True)
+        self.loggerText.setFixedHeight(300)
+        self.loggerText.setFixedWidth(300)
 
         # Miscelanea
         self.title = QLabel()
-        self.title.setText(tipo+" Logger")
+        self.title.setText(log_id+" Logger")
         self.button = QPushButton()
         self.button.clicked.connect(self.click_event)
         self.button.setText('Cerrar')
@@ -111,4 +113,4 @@ class CustomLogger(QWidget, logging.Handler):
     def click_event(self):
         print('click_event ejecutado')
         text = 'Prueba a las {}'.format(time.time())
-        logging.info(text)
+        self.log.info(text)
