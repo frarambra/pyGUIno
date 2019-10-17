@@ -3,6 +3,7 @@ import serial
 
 class AbstractCommunication:
     def __init__(self, args):
+        print("Communication: Instanciando comunicacion: "+args['type'])
         comm_type = args['type']
         self.comm_obj = None
         if comm_type == 'serial':
@@ -27,6 +28,7 @@ class CommSerial:
     def read_from_arduino(self):
         ard_inf = self.ser.readline()
         print(ard_inf)
+
 
 class CommWifi:
     def __init__(self, *args):

@@ -4,7 +4,9 @@ import logging
 
 class Core:
     def __init__(self, layout, comm_args, list_widgets):
+        print("Core: Instanciando")
         self.non_free_spots = []
+        self.comm = None
         # Procedemos a iniciar la comunicacion
         self.layout = layout
         if comm_args:
@@ -22,6 +24,7 @@ class Core:
 
         # Nuestras cosas de informacion
         # loop = asyncio.get_event_loop()
+        print("Core: Instanciado")
 
     # Para cuando le den a cargar
     def core_load(self, args):
