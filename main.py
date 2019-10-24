@@ -4,6 +4,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from functools import partial
 from serial.tools.list_ports import comports
 
+
 class BaseApp:
     def __init__(self, mainwindow):
         print("BaseApp: Instanciando")

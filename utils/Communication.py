@@ -1,33 +1,38 @@
-import serial
+import PyCmdMessenger
 
 
 class AbstractCommunication:
     def __init__(self, args):
+        commands = [
+            # 0, no se hace tracking de los valores; 1 se hace tracking al valor, la posicion indica el pin
+            # orden: A0->AX, despues los digitales
+            ["add_track_pin", "?*"],
+            ["stop_track_pin", "i*"],  # First arg will be the number of pins to stop then the pin_id
+            ["get_var_dirs", ""],
+            ["get_var_value", ""],
+            ["set_var_value", ""],
+            ["await_pins", "i*"]
+        ]
         print("Communication: Instanciando comunicacion: "+args['type'])
         comm_type = args['type']
         self.comm_obj = None
-        if comm_type == 'serial':
+        if comm_type == 'Serial':
             self.comm_obj = CommSerial(args)
-        elif comm_type == 'wifi':
+        elif comm_type == 'WiFi':
             self.comm_obj = CommWifi(args)
-        elif comm_type == 'bluetooth':
+        elif comm_type == 'Bluetooth':
             self.comm_obj = CommBluetooth(args)
 
 
 class CommSerial:
     def __init__(self, args):
-        port = args['port']
-        baudrate = args['baudrate']
-        self.ser = serial.Serial(port=port, baudrate=baudrate)
-        self.ser.open()
-        print("Comunicacion iniciada")
+        pass
 
     def request_from_arduino(self, pin):
-        self.ser.write("r:{}\r\n".format(pin))
+        pass
 
     def read_from_arduino(self):
-        ard_inf = self.ser.readline()
-        print(ard_inf)
+        pass
 
 
 class CommWifi:
