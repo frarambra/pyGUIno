@@ -1,45 +1,35 @@
 import PyCmdMessenger
 
 
-class AbstractCommunication:
+class CommunicationWrapper:
     def __init__(self, args):
-        commands = [
-            # 0, no se hace tracking de los valores; 1 se hace tracking al valor, la posicion indica el pin
-            # orden: A0->AX, despues los digitales
-            ["add_track_pin", "?*"],
-            ["stop_track_pin", "i*"],  # First arg will be the number of pins to stop then the pin_id
-            ["get_var_dirs", ""],
-            ["get_var_value", ""],
-            ["set_var_value", ""],
-            ["await_pins", "i*"]
+        self.board = None
+        self.commands = [
+            ["request_pin", "i"],  # First arg will be the number of pins to start tracking then the pin number
+            ["transmit_pin_value", "ii"],  # First arg will be the number of pins to stop tracking then the pin numer
+            ["transmit_debug_var", "iis"]  # type of data, memory address, human identifier
         ]
-        print("Communication: Instanciando comunicacion: "+args['type'])
-        comm_type = args['type']
-        self.comm_obj = None
-        if comm_type == 'Serial':
-            self.comm_obj = CommSerial(args)
-        elif comm_type == 'WiFi':
-            self.comm_obj = CommWifi(args)
-        elif comm_type == 'Bluetooth':
-            self.comm_obj = CommBluetooth(args)
+
+        if args['type'] == 'Serial':
+            self.board = PyCmdMessenger.ArduinoBoard(args['port'], args['baudrate'])
+            self.cmd = PyCmdMessenger.CmdMessenger(self.board, self.commands)
+        elif args['type'] == 'WiFi':
+            self.board = PlaceHolder()
+        elif args['type'] == 'Bluetooth':
+            self.board = PlaceHolder()
+
+    def recieve(self):
+        # This function is blocking thus it should be on the loop
+        msg = self.cmd.receive()
+        return msg
 
 
-class CommSerial:
-    def __init__(self, args):
+class PlaceHolder:
+    def __init__(self):
         pass
 
-    def request_from_arduino(self, pin):
+    def recieve(self):
         pass
 
-    def read_from_arduino(self):
+    def send(self, args):
         pass
-
-
-class CommWifi:
-    def __init__(self, *args):
-        print("CommWifi creado")
-
-
-class CommBluetooth:
-    def __init__(self, *args):
-        print("CommBluetooth creado")

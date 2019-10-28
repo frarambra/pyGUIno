@@ -124,7 +124,6 @@ class BaseApp:
 class ConnectionForm(QtWidgets.QDialog):
     # Sera el formulario para realizar la conexion, sea cual sea
     def __init__(self, args):
-        # TODO: Comprobar datos de entrada
         QtWidgets.QDialog.__init__(self)
         print("ConnectionForm: Instanciando")
         self.selected = args['type']
@@ -188,7 +187,7 @@ class ConnectionForm(QtWidgets.QDialog):
 
         print('ConnectionForm: valores de comm_args\n{}'.format(comm_args))
         if self.validate_input(comm_args):
-            self.core.comm = Communication.AbstractCommunication(comm_args)
+            self.core.set_comm(comm_args)
             super().accept()
 
         else:

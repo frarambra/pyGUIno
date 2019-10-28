@@ -1,4 +1,5 @@
-from utils import Communication, CustomWidgets
+from utils import CustomWidgets
+from utils.Communication import CommunicationWrapper
 import logging
 
 
@@ -6,11 +7,20 @@ class Core:
     def __init__(self, layout, comm_args, list_widgets):
         print("Core: Instanciando")
         self.non_free_spots = []
+        self.commands = [
+            # 0, no se hace tracking de los valores; 1 se hace tracking al valor, la posicion indica el pin
+            # orden: A0->AX, despues los digitales
+            ["add_track_pin", "?*"],
+            ["stop_track_pin", "i*"],  # First arg will be the number of pins to stop then the pin_id
+            ["get_debug_vars", ""],
+            ["set_debug_var_value", ""],
+            ["await_pins", "i*"]
+        ]
         self.comm = None
         # Procedemos a iniciar la comunicacion
         self.layout = layout
         if comm_args:
-            self.comm = Communication.AbstractCommunication(comm_args)
+            pass  # self.comm = Communication.AbstractCommunication(comm_args)
         # Iniciamos los loggers
         self.logs = ['I2C', 'SPI', 'COM']
         # noinspection PyShadowingBuiltins
@@ -26,17 +36,28 @@ class Core:
         # loop = asyncio.get_event_loop()
         print("Core: Instanciado")
 
-    # Para cuando le den a cargar
-    def core_load(self, args):
-        # usar los datos de args y llamar al constructor
-        pass
+    # Communication related methods
+    def set_comm(self, comm_args):
+        self.comm = CommunicationWrapper(comm_args)
 
-    # Esto deberia ser async
     def handle_new_data(self):
-        data = self.comm.getData()  # La estructura del mensaje deberia ser [PIN | Valor | timestamp]
-        for widget in self.list_widgets:
-            widget.new_data(data)
+        msg = self.comm.recieve()
+        command = msg[0]
 
+        if command == self.commands[0]:
+            pass
+        elif command == self.commands[1]:
+            pass
+        elif command == self.commands[2]:
+            pass
+        elif command == self.commands[3]:
+            pass
+        elif command == self.commands[5]:
+            pass
+        elif command == self.commands[6]:
+            pass
+
+    # Widget related methods
     @staticmethod
     def logger_notify(name, data):
         log = logging.getLogger(name)
