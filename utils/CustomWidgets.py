@@ -1,69 +1,63 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QSizePolicy, QLabel, QPlainTextEdit, QPushButton
-from PyQt5.QtCore import pyqtSlot
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPlainTextEdit, QPushButton
+from PyQt5.QtCore import pyqtSlot, QTimer
 
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
-from matplotlib.figure import Figure
-
+import pyqtgraph as pg
 import numpy as np
 import time
 import logging
 
 
 class WidgetPlot(QWidget):
-    def __init__(self, pin):
+    def __init__(self, pin_and_eval):
         QWidget.__init__(self)
-        # TODO: Cambiar esto es filler y temporal, deberia haber multiples instancias para un mismo pin?
         # haria falta un formulario para escoger la posicion en el grid o bastaria con un "drag and drop"
-        self.pin = pin
+        pg.setConfigOption('background', 'w')
+        pg.setConfigOption('foreground', 'k')
+        self.setLayout(QVBoxLayout())
+        self.plot_widget = pg.PlotWidget(background='w')
+        self.layout().addWidget(self.plot_widget)
+        self.val1 = self.plot_widget.getPlotItem()
+        self.val2 = self.plot_widget.getPlotItem()
+        self.val1.plot()
+        self.val2.plot(pen='b')
 
-        base = QVBoxLayout()
-        self.setLayout(base)
-        # Las canvas de matplotplib
-        fig = Figure(figsize=(10, 8))
-        FigureCanvas.setSizePolicy(self, QSizePolicy.Expanding, QSizePolicy.Expanding)
-        FigureCanvas.updateGeometry(self)
-        self.dynamic_canvas = FigureCanvas(fig)
-        self.navtoolbar = NavigationToolbar(self.dynamic_canvas, self)
+        self.label = QLabel()
+        self.layout().addWidget(self.label)
 
-        # Añadimos al layout los ojbetos
-        self.nombreGrafica = QLabel()
-        self.layout().addWidget(self.nombreGrafica)
-        self.layout().addWidget(self.navtoolbar)
-        self.layout().addWidget(self.dynamic_canvas)
+        # Set Data
 
-        # Estilos
-        self.nombreGrafica.setText('Grafica '+pin)
-        self.nombreGrafica.setMargin(15)
+        self.x = np.linspace(0, 50., num=100)
 
-        self._dynamic_ax = self.dynamic_canvas.figure.subplots()
-        self._update_canvas()
-        self._timer = self.dynamic_canvas.new_timer(10, [(self._update_canvas, (), {})])
-        self._timer.start()
+        self.counter = 0
+        self.fps = 0.
+        self.lastupdate = time.time()
 
-    def _update_canvas(self):
-        # timestamp = args['timestamp']
-        # pin = args['pin']
-        # value = args['value']
+        # Start
+        self._update()
 
-        self._dynamic_ax.clear()
-        t = np.linspace(0, 10, 101)
-        # Aqui se deberian obtener los datos del arduino
-        self._dynamic_ax.plot(t, 10*np.sin(t + time.time()))
-        self._dynamic_ax.figure.canvas.draw()
-        # self._timer.stop()
+    def _update(self):
+
+        self.data = 2*np.cos(self.x/3.+self.counter/9.)
+        self.ydata = np.sin(self.x/3.+self.counter/9.)
+        self.val1.clear()
+        self.val2.clear()
+        self.val1.plot(self.data, pen=pg.mkPen(color=(255, 0, 0)))
+        self.val2.plot(self.ydata, pen=pg.mkPen(color=(0, 0, 255)))
+
+        now = time.time()
+        dt = (now-self.lastupdate)
+        if dt <= 0:
+            dt = 0.000000000001
+        fps2 = 1.0 / dt
+        self.lastupdate = now
+        self.fps = self.fps * 0.9 + fps2 * 0.1
+        tx = 'Mean Frame Rate:  {fps:.3f} FPS'.format(fps=self.fps )
+        self.label.setText(tx)
+        QTimer.singleShot(1, self._update)
+        self.counter += 1
 
     def new_data(self, data):
-        # Estructura de datos PIN | dato | timestamp
-        ts = data['timestamp']
-        pin = data['pin']
-        value = data['value']
-
-        if ts or pin or value is None:
-            return
-        else:
-            # TODO: actualizar aquellos plots que requieran los datos
-            pass
+        pass
 
 
 '''

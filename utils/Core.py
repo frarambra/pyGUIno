@@ -1,20 +1,22 @@
 from utils import CustomWidgets
-from utils.Communication import CommunicationWrapper
 import logging
+import PyCmdMessenger
+import asyncio
 
 
 class Core:
-    def __init__(self, layout, comm_args, list_widgets):
-        print("Core: Instanciando")
+    def __init__(self, layout, comm_args):
+        print("Core: Instantiating")
         self.non_free_spots = []
+        self.list_widgets = []
+        self.debug_var = []
         self.commands = [
-            # 0, no se hace tracking de los valores; 1 se hace tracking al valor, la posicion indica el pin
-            # orden: A0->AX, despues los digitales
-            ["add_track_pin", "?*"],
-            ["stop_track_pin", "i*"],  # First arg will be the number of pins to stop then the pin_id
-            ["get_debug_vars", ""],
-            ["set_debug_var_value", ""],
-            ["await_pins", "i*"]
+            ["ack_start", "s"],  # To recieve: With this we will be aware when the communication has started
+            ["request_pin", "i"],  # To send: First arg will be the number of pins to start tracking then the pin number
+            ["arduino_transmit_pin_value", "ii"],  # To recieve: we recieve the pin and value
+            ["request_debug_var_value", "iI"],  # To send: type of data and memory address
+            ["answer_debug_var_value", "b*"],  # To recieve: the value as an bunch of bytes
+            ["arduino_transmit_debug_var", "iIs"]   # To recieve: type of data, memory address, human identifier
         ]
         self.comm = None
         # Procedemos a iniciar la comunicacion
@@ -22,40 +24,45 @@ class Core:
         if comm_args:
             pass  # self.comm = Communication.AbstractCommunication(comm_args)
         # Iniciamos los loggers
-        self.logs = ['I2C', 'SPI', 'COM']
+
+        logs = ['I2C', 'SPI', 'SERIAL']
         # noinspection PyShadowingBuiltins
-        for id in self.logs:
+        for id in logs:
             log = logging.getLogger(id)
             log.setLevel(logging.INFO)
 
-        # TODO: Inicializacion de los customsWidgets
-        if list_widgets is None:
-            self.list_widgets = []
-
-        # Nuestras cosas de informacion
-        # loop = asyncio.get_event_loop()
-        print("Core: Instanciado")
-
     # Communication related methods
     def set_comm(self, comm_args):
-        self.comm = CommunicationWrapper(comm_args)
+        arduino = PyCmdMessenger.ArduinoBoard(comm_args['port'], comm_args['baudrate'],
+                                              timeout=3.0, settle_time=3.0)
+        self.comm = PyCmdMessenger.CmdMessenger(arduino, self.commands)
 
-    def handle_new_data(self):
-        msg = self.comm.recieve()
-        command = msg[0]
+    async def handle_new_data(self):
+        log = logging.getLogger('SERIAL')
+        while True:
+            msg = await self.comm.recieve()
+            if msg:
+                log.info(msg)
+                command = msg[0]
+                payload = msg[1]
 
-        if command == self.commands[0]:
-            pass
-        elif command == self.commands[1]:
-            pass
-        elif command == self.commands[2]:
-            pass
-        elif command == self.commands[3]:
-            pass
-        elif command == self.commands[5]:
-            pass
-        elif command == self.commands[6]:
-            pass
+                if command == self.commands[0]:  # ack_start
+                    print("Communication started {}".format(payload))
+                elif command == self.commands[2]:  # arduino_transmit_pin_value
+                    for widget in self.list_widgets:
+                        if isinstance(widget, CustomWidgets.WidgetPlot):
+                            widget.new_data(data=payload)
+                elif command == self.commands[5]:  # arduino_transmit_debug_var
+                    # TODO: Decidir sobre como vamos a tratar este tema
+                    # data_type = payload[0]
+                    # mem_addr = payload[1]
+                    # var_name = payload[2]
+                    pass
+
+    def start_recieve_loop(self):
+        loop = asyncio.get_event_loop()
+        loop.create_task(self.handle_new_data())
+        loop.run_forever()
 
     # Widget related methods
     @staticmethod
@@ -69,8 +76,8 @@ class Core:
         (cord_x, cord_y) = self.manage_layout()
         self.layout.addWidget(logger_widget, cord_x, cord_y, 1, 1)
 
-    def create_plot_widget(self, pin):
-        plt_widget = CustomWidgets.WidgetPlot(pin=pin)
+    def create_plot_widget(self, plot_args):
+        plt_widget = CustomWidgets.WidgetPlot(plot_args)
         self.list_widgets.append(plt_widget)
         (cord_x, cord_y) = self.manage_layout()
         self.layout.addWidget(plt_widget, cord_x, cord_y, 1, 1)
