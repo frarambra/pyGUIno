@@ -123,11 +123,9 @@ class PlotForm(QtWidgets.QDialog):
         qlabel1 = QtWidgets.QLabel('Title')
         formlayout.addRow(qlabel1, self.lineedit1)
 
-        # Set of buttons
         add_button = QtWidgets.QPushButton("Add")
         self.delete_button = QtWidgets.QPushButton("Delete")
         self.modify_button = QtWidgets.QPushButton("Modify")
-
         self.delete_button.setEnabled(False)
         self.modify_button.setEnabled(False)
 
@@ -164,7 +162,7 @@ class PlotForm(QtWidgets.QDialog):
         self.setLayout(self.mainLayout)
 
         # Show the form
-        # self.show()  # For some reason isn't showing as ConnectionForm does
+        self.show()  # For some reason isn't showing as ConnectionForm does
         self.exec_()  # This little trick does the job though
         print("PlotForm: Created")
 
@@ -183,27 +181,26 @@ class PlotForm(QtWidgets.QDialog):
         self.qt_table.setItem(append_row, 1, tmp2)
 
     def accept(self):
-        print('Accept starting')
         n_columns = self.qt_table.columnCount()
         n_rows = self.qt_table.rowCount()
         plotting_data = []
-        print('Number of rows: {}'.format(n_rows))
-        print('Number of colums: {}'.format(n_columns))
         for current_row in range(0, n_rows):
             # TODO: When rewriting PlotWidget check this to fit the arguments
             plotting_data_tmp = []
             for i in range(0, n_columns):
                 item = self.qt_table.item(current_row, i)  # row, column
                 plotting_data_tmp.append(item.text())
-                print('Adding item: {}'.format(item.text()))
             plotting_data.append(plotting_data_tmp)
 
         # Call the core to instantiate the PlotWidget
         meta = dict()
         meta['title'] = self.lineedit1.text()
-        self.coreRef.create_plot_widget(meta, plotting_data)
-        print('Added WidgetPlot to Core')
-        super().accept()
+        try:
+            self.coreRef.create_plot_widget(meta, plotting_data)
+        except Exception as err:
+            print(err)
+        finally:
+            super().accept()
 
 
 class PinEvalDialog(QtWidgets.QDialog):

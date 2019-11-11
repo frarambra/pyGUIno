@@ -1,14 +1,171 @@
-from utils import CustomWidgets
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QSizePolicy,\
+    QFrame, QMenuBar, QMenu, QAction, QStatusBar, QErrorMessage,\
+    QTabWidget, QHBoxLayout, QApplication, QMainWindow
+
+from utils import CustomWidgets, Forms
 from PyQt5 import QtCore
-from PyQt5.QtCore import pyqtSlot, pyqtSignal
+from PyQt5.QtCore import pyqtSignal, QRect, QMetaObject, QCoreApplication
+from functools import partial
 import logging
 import PyCmdMessenger
-import asyncio
+import os
+import json
+import sys
 
 
-class Core:
-    def __init__(self, layout, comm_args):
-        print("Core: Instantiating")
+class PyGUIno:
+    def __init__(self):
+        print("PyGUIno: Instantiating")
+        self.app = QApplication(sys.argv)
+        self.size = self.app.primaryScreen().size()
+        mainwindow = QMainWindow()
+        self.tmp = mainwindow  # Shenanigan cause I don't want to refractor
+
+        # Set up mainwindow, parameters
+        mainwindow.resize(self.size.width(), self.size.height())
+        mainwindow.setObjectName("MainWindow")
+        self.centralwidget = QWidget(mainwindow)
+        mainwindow.setCentralWidget(self.centralwidget)
+        self.centralwidget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.statusbar = QStatusBar(mainwindow)
+        mainwindow.setStatusBar(self.statusbar)
+
+        # Instantiate WidgetCoordinator
+        self.widgetCoord = WidgetCoordinator(central_widget=self.centralwidget,
+                                             comm_args=None, size=self.size)
+
+        # Set up menuBar
+        self.menubar = QMenuBar(mainwindow)
+        self.menubar.setGeometry(QRect(0, 0, 800, 21))
+        mainwindow.setMenuBar(self.menubar)
+
+        self.menuFile = QMenu(self.menubar)
+        self.menuConnection = QMenu(self.menuFile)
+        self.menuBoards = QMenu(self.menuFile)
+        self.menuTools = QMenu(self.menubar)
+        self.menuLoggers = QMenu(self.menuTools)
+
+        # Create all QActions
+        self.actionNew = QAction(mainwindow)
+        self.actionLoad = QAction(mainwindow)
+        self.actionSerial = QAction(mainwindow)
+        self.actionStop = QAction(mainwindow)
+        self.actionBluetooth = QAction(mainwindow)
+        self.actionIP = QAction(mainwindow)
+        self.actionComm = QAction(mainwindow)
+        self.actionI2C = QAction(mainwindow)
+        self.actionSPI = QAction(mainwindow)
+        self.actionTable = QAction(mainwindow)
+        self.actionAddPlot = QAction(mainwindow)
+
+        # Set up QAction triggers
+        args1 = {'type': 'Serial', 'core': self.widgetCoord}
+        self.actionSerial.triggered.connect(partial(self.set_connform, args=args1))
+        args2 = {'type': 'WiFi', 'core': self.widgetCoord}
+        self.actionIP.triggered.connect(partial(self.set_connform, args=args2))
+        args3 = {'type': 'Bluetooth', 'core': self.widgetCoord}
+        self.actionBluetooth.triggered.connect(partial(self.set_connform, args=args3))
+
+        schemas = os.listdir("resources\\schemas")
+        self.actionAddPlot.triggered.connect(self.ini_graph_dialog)
+
+        for schema in schemas:
+            fd = open("resources\\schemas\\"+schema, 'r')
+            data = json.load(fd)
+            qaction = QAction(mainwindow)
+            qaction.setText(data['meta']['ui'])
+            print(data['pin'])
+            qaction.triggered.connect(partial(self.set_pin_list, arg_data=data['pin']))
+            self.menuBoards.addAction(qaction)
+            fd.close()
+
+        self.actionI2C.triggered.connect(partial(self.widgetCoord.create_logger_widget, log_id='I2C'))
+        self.actionSPI.triggered.connect(partial(self.widgetCoord.create_logger_widget, log_id='SPI'))
+        self.actionComm.triggered.connect(partial(self.widgetCoord.create_logger_widget, log_id='SERIAL'))
+
+        # Add QAction to QMenu
+        self.menuConnection.addAction(self.actionSerial)
+        self.menuConnection.addAction(self.actionBluetooth)
+        self.menuConnection.addAction(self.actionIP)
+
+        self.menuFile.addAction(self.actionNew)
+        self.menuFile.addAction(self.actionLoad)
+        self.menuFile.addAction(self.actionStop)
+        self.menuFile.addSeparator()
+        self.menuFile.addAction(self.menuConnection.menuAction())
+        self.menuFile.addAction(self.menuBoards.menuAction())
+        self.menuLoggers.addAction(self.actionComm)
+        self.menuLoggers.addAction(self.actionI2C)
+        self.menuLoggers.addAction(self.actionSPI)
+        self.menuTools.addAction(self.menuLoggers.menuAction())
+        self.menuTools.addAction(self.actionAddPlot)
+        self.menuTools.addAction(self.actionTable)
+        self.menubar.addAction(self.menuFile.menuAction())
+        self.menubar.addAction(self.menuTools.menuAction())
+
+        self.retranslate_ui(mainwindow)
+        QMetaObject.connectSlotsByName(mainwindow)
+
+        # Hacemos que actuen a los triggers para loggers
+
+        print("BaseApp: Instanciado")
+
+    def retranslate_ui(self, mainwindow):
+        _translate = QCoreApplication.translate
+        mainwindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
+        self.menuFile.setTitle(_translate("MainWindow", "Archivo"))
+        self.menuConnection.setTitle(_translate("MainWindow", "Conexion"))
+        self.menuBoards.setTitle(_translate("MainWindow", "Boards"))
+        self.actionIP.setText(_translate("MainWindow", "IP"))
+        self.menuTools.setTitle(_translate("MainWindow", "Herramientas"))
+        self.menuLoggers.setTitle(_translate("MainWindow", "Loggers"))
+        self.actionAddPlot.setText(_translate("MainWindow", "Graficas"))
+        self.actionNew.setText(_translate("MainWindow", "Nuevo"))
+        self.actionLoad.setText(_translate("MainWindow", "Cargar"))
+        self.actionSerial.setText(_translate("MainWindow", "Serial"))
+        self.actionBluetooth.setText(_translate("MainWindow", "Bluetooth"))
+        self.actionComm.setText(_translate("MainWindow", "Comm"))
+        self.actionI2C.setText(_translate("MainWindow", "I2C"))
+        self.actionSPI.setText(_translate("MainWindow", "SPI"))
+        self.actionTable.setText(_translate("MainWindow", "Tabla"))
+        self.actionStop.setText(_translate("MainWindow", "Stop"))
+
+    def start(self):
+        self.tmp.show()
+        sys.exit(self.app.exec_())
+
+    # Functions to trigger several menu actions
+    def new_action(self):
+        pass
+
+    def load_action(self):
+        pass
+
+    def ini_graph_dialog(self):
+        if self.pin_list:
+            print("BaseApp: Creating PlotForm")
+            Forms.PlotForm(self.widgetCoord, self.pin_list)
+        else:
+            error_msg = QErrorMessage()
+            error_msg.showMessage("Please select a board first")
+            error_msg.show()
+
+    def set_pin_list(self, arg_data):
+        self.pin_list = arg_data
+
+    def set_connform(self, args):
+        print('BaseApp: Creating ConnectionForm')
+        self.connForm = Forms.ConnectionForm(args)
+    pass
+
+
+class WidgetCoordinator:
+
+    def __init__(self, central_widget, comm_args, size):
+        print("WidgetCoordinator: Instantiating")
+        # Class attributes
+        width = size.width()
+        height = size.height()
         self.non_free_spots = []
         self.list_widgets = []
         self.debug_var = []
@@ -20,32 +177,67 @@ class Core:
             ["answer_debug_var_value", "b*"],  # To recieve: the value as an bunch of bytes
             ["arduino_transmit_debug_var", "iIs"]   # To recieve: type of data, memory address, human identifier
         ]
-        self.comm = None
         self.recv_thread = None
-        # Procedemos a iniciar la comunicacion
-        self.layout = layout
-        if comm_args:
-            pass  # self.comm = Communication.AbstractCommunication(comm_args)
-        # Iniciamos los loggers
 
+        # Start communication
+        if comm_args:
+            self.set_comm(comm_args=comm_args)
+
+        # Create loggers
         logs = ['I2C', 'SPI', 'SERIAL']
-        # noinspection PyShadowingBuiltins
-        for id in logs:
-            log = logging.getLogger(id)
+        for log_id in logs:
+            log = logging.getLogger(log_id)
             log.setLevel(logging.INFO)
+
+        # Create layout for the widgets
+        q_plot = QFrame()
+        q_logger = QFrame()
+        q_table = QFrame()
+        q_plot.setFrameStyle(QFrame.StyledPanel | QFrame.Sunken)
+        q_logger.setFrameStyle(QFrame.StyledPanel | QFrame.Sunken)
+        q_table.setFrameStyle(QFrame.StyledPanel | QFrame.Sunken)
+
+        plt_container = QHBoxLayout()
+        logger_container = QHBoxLayout()
+        table_container = QHBoxLayout()
+
+        self.PlotTabWidget = QTabWidget()
+        self.PlotTabWidget.setFixedWidth(width/2)
+        self.PlotTabWidget.setFixedHeight(height/2)
+        self.LoggerTabWidget = QTabWidget()
+        self.LoggerTabWidget.setFixedWidth(width/2)
+        self.LoggerTabWidget.setFixedHeight(height/2)
+        self.TableTabWidget = QTabWidget()
+
+        plt_container.addWidget(self.PlotTabWidget)
+        logger_container.addWidget(self.LoggerTabWidget)
+        table_container.addWidget(self.TableTabWidget)
+
+        q_plot.setLayout(plt_container)
+        q_logger.setLayout(logger_container)
+        q_table.setLayout(table_container)
+
+        # self.PlotTabWidget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+        self.mainLayout = QVBoxLayout(central_widget)
+        upper_layout = QHBoxLayout()
+        upper_layout.addWidget(q_plot)
+        upper_layout.addWidget(q_logger)
+        self.mainLayout.addLayout(upper_layout)
+        self.mainLayout.addWidget(q_table)
 
     # Communication related methods
     def set_comm(self, comm_args):
         try:
-            print('Core: instantiate communication thread')
+            print('WidgetCoordinator: instantiate communication thread')
             self.recv_thread = QThreadComm(self.commands, comm_args)
-            print('Core: connecting signal to function')
+            print('WidgetCoordinator: connecting signal to function')
             self.recv_thread.signal.connect(self.handle_new_data)
             self.recv_thread.start()
         except Exception as err:
             print(err.__class__)
             print(err)
-            if self.recv_thread:
+            if self.recv_thread and self.recv_thread.isRunning():
                 self.recv_thread.stop()
 
     def stop_comm(self):
@@ -53,6 +245,9 @@ class Core:
             self.recv_thread.stop()
 
     def handle_new_data(self, msg):
+        input_log = logging.getLogger('SERIAL')
+        input_log.info("SERIAL\\In: {}".format(msg))
+
         command = msg[0]
         payload = msg[1]
         ts = msg[2]
@@ -77,31 +272,21 @@ class Core:
         log = logging.getLogger(name)
         log.info(data)
 
-    def create_logger_widget(self, log_id):
-        logger_widget = CustomWidgets.CustomLogger(log_id=log_id)
-        self.list_widgets.append(logger_widget)
-        (cord_x, cord_y) = self.manage_layout()
-        self.layout.addWidget(logger_widget, cord_x, cord_y, 1, 1)
-
     def create_plot_widget(self, meta, plot_args):
-        plt_widget = CustomWidgets.WidgetPlot(meta, plot_args)
-        self.list_widgets.append(plt_widget)
-        (cord_x, cord_y) = self.manage_layout()
-        self.layout.addWidget(plt_widget, cord_x, cord_y, 1, 1)
+        plot_widget = CustomWidgets.WidgetPlot(meta, plot_args)
+        self.list_widgets.append(plot_widget)
+        self.PlotTabWidget.addTab(plot_widget, "")
 
-    def manage_layout(self):
-        if not self.non_free_spots:
-            x = 0
-            y = 0
-        # si el segundo elemento de la lista es 0
-        elif self.non_free_spots[-1][1] == 0:
-            x = self.non_free_spots[-1][0]
-            y = self.non_free_spots[-1][1]+1
-        else:
-            x = self.non_free_spots[-1][0]+1
-            y = 0  # La y deberia ser 0
-        self.non_free_spots.append((x, y))
-        return x, y
+    def create_logger_widget(self, log_id):
+        log_widget = CustomWidgets.CustomLogger(log_id=log_id)
+        self.list_widgets.append(log_widget)
+        self.LoggerTabWidget.addTab(log_widget, "")
+
+    def create_table_widget(self):
+        # TODO: There won't be tabs for this, it's only temporal
+        table_widget = CustomWidgets.UserVarsTable()
+        self.list_widgets.append(table_widget)
+        self.TableTabWidget.addTab(table_widget, "")
 
 
 class QThreadComm(QtCore.QThread):
