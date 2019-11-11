@@ -1,14 +1,143 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPlainTextEdit, QPushButton
-from PyQt5.QtCore import pyqtSlot, QTimer
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPlainTextEdit, \
+    QPushButton, QSizePolicy, QGridLayout, QMenuBar, QMenu, QAction, QStatusBar, QErrorMessage
+from PyQt5.QtCore import pyqtSlot, QTimer, QRect, QMetaObject, QCoreApplication
+from functools import partial
+from utils import Forms, Core
 
 import pyqtgraph as pg
-import numpy as np
 import time
 import logging
+import json
+import os
+
+
+class BaseApp:
+    def __init__(self, mainwindow):
+        print("BaseApp: Instantiating")
+        self.pin_list = []
+        mainwindow.resize(800, 600)
+        mainwindow.setObjectName("MainWindow")
+        self.centralwidget = QWidget(mainwindow)
+        mainwindow.setCentralWidget(self.centralwidget)
+        self.centralwidget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+        self.gridLayoutWidget = QGridLayout(self.centralwidget)
+        self.core = Core.Core(layout=self.gridLayoutWidget, comm_args=None)
+
+        self.menubar = QMenuBar(mainwindow)
+        self.menubar.setGeometry(QRect(0, 0, 800, 21))
+
+        self.menuArchivo = QMenu(self.menubar)
+        self.menuConexion = QMenu(self.menuArchivo)
+        self.connForm = None
+        self.menuBoards = QMenu(self.menuArchivo)
+
+        self.menuHerramientas = QMenu(self.menubar)
+        self.menuLoggers = QMenu(self.menuHerramientas)
+
+        mainwindow.setMenuBar(self.menubar)
+        self.statusbar = QStatusBar(mainwindow)
+        mainwindow.setStatusBar(self.statusbar)
+
+        # Instanciamos los QAction
+        self.actionNuevo = QAction(mainwindow)
+        self.actionCargar = QAction(mainwindow)
+        self.actionSerial = QAction(mainwindow)
+        self.actionStop = QAction(mainwindow)
+        self.actionBluetooth = QAction(mainwindow)
+        self.actionIP = QAction(mainwindow)
+        self.actionComm = QAction(mainwindow)
+        self.actionI2C = QAction(mainwindow)
+        self.actionSPI = QAction(mainwindow)
+        self.actionTabla = QAction(mainwindow)
+        self.actionGrafica = QAction(mainwindow)
+
+        # Añadimos los triggers
+        args1 = {'type': 'Serial', 'core': self.core}
+        self.actionSerial.triggered.connect(partial(self.set_connform, args=args1))
+        args2 = {'type': 'WiFi', 'core': self.core}
+        self.actionIP.triggered.connect(partial(self.set_connform, args=args2))
+        schemas = os.listdir("resources\\schemas")
+        self.actionGrafica.triggered.connect(self.ini_graph_dialog)
+
+        for schema in schemas:
+            fd = open("resources\\schemas\\"+schema, 'r')
+            data = json.load(fd)
+            qaction = QAction(mainwindow)
+            qaction.setText(data['meta']['ui'])
+            print(data['pin'])
+            qaction.triggered.connect(partial(self.set_pin_list, arg_data=data['pin']))
+            self.menuBoards.addAction(qaction)
+            fd.close()
+
+        self.menuConexion.addAction(self.actionSerial)
+        self.menuConexion.addAction(self.actionBluetooth)
+        self.menuConexion.addAction(self.actionIP)
+
+        self.menuArchivo.addAction(self.actionNuevo)
+        self.menuArchivo.addAction(self.actionCargar)
+        self.menuArchivo.addAction(self.actionStop)
+        self.menuArchivo.addSeparator()
+        self.menuArchivo.addAction(self.menuConexion.menuAction())
+        self.menuArchivo.addAction(self.menuBoards.menuAction())
+        self.menuLoggers.addAction(self.actionComm)
+        self.menuLoggers.addAction(self.actionI2C)
+        self.menuLoggers.addAction(self.actionSPI)
+        self.menuHerramientas.addAction(self.menuLoggers.menuAction())
+        self.menuHerramientas.addAction(self.actionGrafica)
+        self.menuHerramientas.addAction(self.actionTabla)
+        self.menubar.addAction(self.menuArchivo.menuAction())
+        self.menubar.addAction(self.menuHerramientas.menuAction())
+
+        self.retranslate_ui(mainwindow)
+        QMetaObject.connectSlotsByName(mainwindow)
+
+        # Hacemos que actuen a los triggers para loggers
+        self.actionI2C.triggered.connect(partial(self.core.create_logger_widget, log_id='I2C'))
+        self.actionSPI.triggered.connect(partial(self.core.create_logger_widget, log_id='SPI'))
+        self.actionComm.triggered.connect(partial(self.core.create_logger_widget, log_id='SERIAL'))
+
+        print("BaseApp: Instanciado")
+
+    def retranslate_ui(self, mainwindow):
+        _translate = QCoreApplication.translate
+        mainwindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
+        self.menuArchivo.setTitle(_translate("MainWindow", "Archivo"))
+        self.menuConexion.setTitle(_translate("MainWindow", "Conexion"))
+        self.menuBoards.setTitle(_translate("MainWindow", "Boards"))
+        self.actionIP.setText(_translate("MainWindow", "IP"))
+        self.menuHerramientas.setTitle(_translate("MainWindow", "Herramientas"))
+        self.menuLoggers.setTitle(_translate("MainWindow", "Loggers"))
+        self.actionGrafica.setText(_translate("MainWindow", "Graficas"))
+        self.actionNuevo.setText(_translate("MainWindow", "Nuevo"))
+        self.actionCargar.setText(_translate("MainWindow", "Cargar"))
+        self.actionSerial.setText(_translate("MainWindow", "Serial"))
+        self.actionBluetooth.setText(_translate("MainWindow", "Bluetooth"))
+        self.actionComm.setText(_translate("MainWindow", "Comm"))
+        self.actionI2C.setText(_translate("MainWindow", "I2C"))
+        self.actionSPI.setText(_translate("MainWindow", "SPI"))
+        self.actionTabla.setText(_translate("MainWindow", "Tabla"))
+        self.actionStop.setText(_translate("MainWindow", "Stop"))
+
+    def ini_graph_dialog(self):
+        if self.pin_list:
+            print("BaseApp: Creating PlotForm")
+            Forms.PlotForm(self.core, self.pin_list)
+        else:
+            error_msg = QErrorMessage()
+            error_msg.showMessage("Please select a board first")
+            error_msg.exec_()
+
+    def set_pin_list(self, arg_data):
+        self.pin_list = arg_data
+
+    def set_connform(self, args):
+        print('BaseApp: Creating ConnectionForm')
+        self.connForm = Forms.ConnectionForm(args)
 
 
 class WidgetPlot(QWidget):
-    def __init__(self, pin_and_eval):
+    def __init__(self, meta, pin_and_eval):
         QWidget.__init__(self)
         # haria falta un formulario para escoger la posicion en el grid o bastaria con un "drag and drop"
         pg.setConfigOption('background', 'w')
@@ -16,48 +145,49 @@ class WidgetPlot(QWidget):
         self.setLayout(QVBoxLayout())
         self.plot_widget = pg.PlotWidget(background='w')
         self.layout().addWidget(self.plot_widget)
-        self.val1 = self.plot_widget.getPlotItem()
-        self.val2 = self.plot_widget.getPlotItem()
-        self.val1.plot()
-        self.val2.plot(pen='b')
 
-        self.label = QLabel()
-        self.layout().addWidget(self.label)
+        self.contained_plots = []
+        self.t_ini = time.time()
+        # Set title and such from "meta"
 
-        # Set Data
+        for tmp in pin_and_eval:
+            plt_item = self.plot_widget.getPlotItem()
+            plt_aux_tmp = self.PltAux(pin=tmp[0], plt_item=plt_item)
+            self.contained_plots.append(plt_aux_tmp)
 
-        self.x = np.linspace(0, 50., num=100)
+    def new_data(self, data, timestamp):
+        pin = data[0]
+        value = data[1]
+        print('WidgetPlot: {}'.format(self.contained_plots))
 
-        self.counter = 0
-        self.fps = 0.
-        self.lastupdate = time.time()
+        for plt_aux in self.contained_plots:
+            print('WidgetPlot: Pin->{}'.format(plt_aux.pin))
+            if plt_aux.pin == str(pin):
+                print('WidgetPlot: begin update for {}'.format(plt_aux))
+                plt_aux.update(timestamp-self.t_ini, value)
+                print("time_axe:  {}".format(plt_aux.time_axe))
+                print("value_axe:  {}".format(plt_aux.value_axe))
 
-        # Start
-        self._update()
+    # TODO: Implement evaluation function with either exec or eval
+    class PltAux:
+        def __init__(self, pin, plt_item):
+            # Length must match
+            self.limit = 100
+            self.pin = pin
+            self.plt_item = plt_item
+            self.time_axe = []
+            self.value_axe = []
 
-    def _update(self):
+        def update(self, ts, value):
+            self.shift(ts, value)
+            self.plt_item.plot(self.time_axe, self.value_axe)
 
-        self.data = 2*np.cos(self.x/3.+self.counter/9.)
-        self.ydata = np.sin(self.x/3.+self.counter/9.)
-        self.val1.clear()
-        self.val2.clear()
-        self.val1.plot(self.data, pen=pg.mkPen(color=(255, 0, 0)))
-        self.val2.plot(self.ydata, pen=pg.mkPen(color=(0, 0, 255)))
-
-        now = time.time()
-        dt = (now-self.lastupdate)
-        if dt <= 0:
-            dt = 0.000000000001
-        fps2 = 1.0 / dt
-        self.lastupdate = now
-        self.fps = self.fps * 0.9 + fps2 * 0.1
-        tx = 'Mean Frame Rate:  {fps:.3f} FPS'.format(fps=self.fps )
-        self.label.setText(tx)
-        QTimer.singleShot(1, self._update)
-        self.counter += 1
-
-    def new_data(self, data):
-        pass
+        def shift(self, ts, value):
+            if len(self.time_axe) >= self.limit:
+                self.time_axe.pop(0)
+                self.value_axe.pop(0)
+            self.time_axe.append(ts)
+            self.value_axe.append(value)
 
 
 '''
@@ -108,3 +238,7 @@ class CustomLogger(QWidget, logging.Handler):
         print('click_event ejecutado')
         text = 'Prueba a las {}'.format(time.time())
         self.log.info(text)
+
+
+
+

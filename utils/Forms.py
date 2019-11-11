@@ -5,7 +5,7 @@ import re
 
 
 class ConnectionForm(QtWidgets.QDialog):
-    def __init__(self, core, args):
+    def __init__(self, args):
         print("ConnectionForm: Instanciando")
         QtWidgets.QDialog.__init__(self)
         self.selected = args['type']
@@ -119,9 +119,9 @@ class PlotForm(QtWidgets.QDialog):
         # form Box
         formlayout = QtWidgets.QFormLayout()
         formbox = QtWidgets.QGroupBox("General settings")
-        lineedit1 = QtWidgets.QLineEdit()
+        self.lineedit1 = QtWidgets.QLineEdit()
         qlabel1 = QtWidgets.QLabel('Title')
-        formlayout.addRow(qlabel1, lineedit1)
+        formlayout.addRow(qlabel1, self.lineedit1)
 
         # Set of buttons
         add_button = QtWidgets.QPushButton("Add")
@@ -164,7 +164,7 @@ class PlotForm(QtWidgets.QDialog):
         self.setLayout(self.mainLayout)
 
         # Show the form
-        # self.show()  For some reason isn't showing as ConnectionForm does
+        # self.show()  # For some reason isn't showing as ConnectionForm does
         self.exec_()  # This little trick does the job though
         print("PlotForm: Created")
 
@@ -183,19 +183,26 @@ class PlotForm(QtWidgets.QDialog):
         self.qt_table.setItem(append_row, 1, tmp2)
 
     def accept(self):
-        n_columns = self.qt_table.colorCount()
+        print('Accept starting')
+        n_columns = self.qt_table.columnCount()
+        n_rows = self.qt_table.rowCount()
         plotting_data = []
-        for current_row in range(0, self.qt_table.rowCount()):
-            # Pillar cada elemento de la tabla
+        print('Number of rows: {}'.format(n_rows))
+        print('Number of colums: {}'.format(n_columns))
+        for current_row in range(0, n_rows):
             # TODO: When rewriting PlotWidget check this to fit the arguments
             plotting_data_tmp = []
             for i in range(0, n_columns):
-                item = self.qt_table.itemAt(current_row, i)  # row, column
+                item = self.qt_table.item(current_row, i)  # row, column
                 plotting_data_tmp.append(item.text())
+                print('Adding item: {}'.format(item.text()))
             plotting_data.append(plotting_data_tmp)
 
         # Call the core to instantiate the PlotWidget
-        self.coreRef.create_plot_widget(plotting_data)
+        meta = dict()
+        meta['title'] = self.lineedit1.text()
+        self.coreRef.create_plot_widget(meta, plotting_data)
+        print('Added WidgetPlot to Core')
         super().accept()
 
 
@@ -226,7 +233,8 @@ class PinEvalDialog(QtWidgets.QDialog):
         main_layout.addWidget(button_box)
         self.setLayout(main_layout)
 
-        self.show()
+        # self.show()
+        self.exec_()
 
     def custom_accept(self, form_to_notify):
         # Get the user input and give it to form_to_notify
