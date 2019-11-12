@@ -83,6 +83,8 @@ class PyGUIno:
         self.actionSPI.triggered.connect(partial(self.widgetCoord.create_logger_widget, log_id='SPI'))
         self.actionComm.triggered.connect(partial(self.widgetCoord.create_logger_widget, log_id='SERIAL'))
 
+        self.actionTable.triggered.connect(self.widgetCoord.create_table_widget)
+
         # Add QAction to QMenu
         self.menuConnection.addAction(self.actionSerial)
         self.menuConnection.addAction(self.actionBluetooth)
@@ -161,6 +163,8 @@ class PyGUIno:
 
 class WidgetCoordinator:
 
+    table_sig = pyqtSignal(dict)
+
     def __init__(self, central_widget, comm_args, size):
         print("WidgetCoordinator: Instantiating")
         # Class attributes
@@ -175,10 +179,11 @@ class WidgetCoordinator:
             ["arduino_transmit_pin_value", "ii"],  # To recieve: we recieve the pin and value
             ["request_debug_var_value", "iI"],  # To send: type of data and memory address
             ["answer_debug_var_value", "b*"],  # To recieve: the value as an bunch of bytes
-            ["arduino_transmit_debug_var", "iIs"]   # To recieve: type of data, memory address, human identifier
+            ["arduino_transmit_debug_var", "iIsb*"]   # To recieve: type of data, memory address, human identifier
+            # and value as a bunch of bytes
         ]
         self.recv_thread = None
-
+        self.comm = None
         # Start communication
         if comm_args:
             self.set_comm(comm_args=comm_args)
@@ -229,9 +234,15 @@ class WidgetCoordinator:
     # Communication related methods
     def set_comm(self, comm_args):
         try:
-            print('WidgetCoordinator: instantiate communication thread')
-            self.recv_thread = QThreadComm(self.commands, comm_args)
-            print('WidgetCoordinator: connecting signal to function')
+            if comm_args['type'] == 'Serial':
+                arduino = PyCmdMessenger.ArduinoBoard(comm_args['port'], comm_args['baudrate'],
+                                                      timeout=3.0, settle_time=3.0)
+                self.comm = PyCmdMessenger.CmdMessenger(arduino, self.commands)
+            elif comm_args['type'] == 'WiFi':
+                pass
+            elif comm_args['type'] == 'Bluetooth':
+                pass
+            self.recv_thread = QThreadComm(self.comm)
             self.recv_thread.signal.connect(self.handle_new_data)
             self.recv_thread.start()
         except Exception as err:
@@ -251,7 +262,6 @@ class WidgetCoordinator:
         command = msg[0]
         payload = msg[1]
         ts = msg[2]
-        print('command: {}\npayload: {}\ntimestamp: {}'.format(command, payload, ts))
 
         if command == self.commands[0][0]:  # ack_start
             print("Communication started {}".format(payload))
@@ -260,11 +270,33 @@ class WidgetCoordinator:
                 if isinstance(widget, CustomWidgets.WidgetPlot):
                     widget.new_data(data=payload, timestamp=ts)
         elif command == self.commands[5][0]:  # arduino_transmit_debug_var
-            # TODO: Decidir sobre como vamos a tratar este tema
-            # data_type = payload[0]
-            # mem_addr = payload[1]
-            # var_name = payload[2]
-            pass
+            try:
+                dict_to_emit = dict()
+                list_index = payload[0]
+                type_list = [
+                    # TODO: check every data type properly works
+                    (self.comm._recv_bool, 'bool'),
+                    (self.comm._recv_byte, 'byte'),
+                    (self.comm._recv_char, 'char'),
+                    (self.comm._recv_float, 'float'),
+                    (self.comm._recv_double, 'double'),  # 8 in Arduino Due
+                    (self.comm._recv_int, 'int'),  # 4 on Due, Zero...
+                    (self.comm._recv_long, 'long'),
+                    (self.comm._recv_int, 'short'),
+                    (self.comm._recv_unsigned_int, 'unsigned int'),  # 4 on Due
+                    (self.comm._recv_unsigned_int, 'unsigned short'),
+                    (self.comm._recv_unsigned_long, 'unsigned long')
+                ]
+                # type of data, memory address, human identifier
+                to_python_data = type_list[list_index][0]
+                dict_to_emit['data_type'] = type_list[list_index][1]
+                dict_to_emit['addr'] = payload[1]
+                dict_to_emit['name'] = payload[2]
+                tmp = to_python_data(bytes(payload[3:]))
+                print(tmp)
+                dict_to_emit['value'] = tmp
+            except Exception as err:
+                print(err)
 
     # Widget related methods
     @staticmethod
@@ -293,29 +325,19 @@ class QThreadComm(QtCore.QThread):
 
     signal = pyqtSignal(tuple)  # Mandatory to be defined at level class
 
-    def __init__(self, commands, comm_args):
+    def __init__(self, comm):
         QtCore.QThread.__init__(self, parent=None)
-        self.comm = None
+        self.comm = comm
         self.keep_going = True
-        if comm_args['type'] == 'Serial':
-            self.arduino = PyCmdMessenger.ArduinoBoard(comm_args['port'], comm_args['baudrate'],
-                                                  timeout=3.0, settle_time=3.0)
-            self.comm = PyCmdMessenger.CmdMessenger(self.arduino, commands)
-        elif comm_args['type'] == 'WiFi':
-            pass
-        elif comm_args['type'] == 'Bluetooth':
-            pass
 
     def run(self):
         while self.keep_going:
-            msg = self.comm.receive()
-            if msg:
-                try:
+            try:
+                msg = self.comm.receive()
+                if msg:
                     self.signal.emit(msg)
-                except Exception as err:
-                    print(err)
+            except Exception as err:
+                print(err)
 
     def stop(self):
         self.keep_going = False
-        self.arduino.close()
-

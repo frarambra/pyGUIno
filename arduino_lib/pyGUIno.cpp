@@ -3,6 +3,7 @@
 * Website: https://github.com/frarambra
 *
 **/
+
 #include "pyGUIno.h"
 #include "CmdMessenger.h"
 #include "Arduino.h"
@@ -33,67 +34,76 @@ void on_request_pin(){
 	pc_side->sendBinCmd(request_pin, value);
 }
 
-void add_update_debug_var(int data, void *addr, const char name[]){
+void actual_add_update(int data, int offset, void *addr, const char name[]){
 	pc_side->sendCmdStart(arduino_transmit_debug_var);
-	pc_side->sendCmdBinArg<int>(data);
+	pc_side->sendCmdBinArg<int>(data); //Data type
 	unsigned int tmp = (unsigned int) addr;
-	pc_side->sendCmdBinArg<unsigned int>(tmp);
-	pc_side->sendCmdArg(name);
+	pc_side->sendCmdBinArg<unsigned int>(tmp); //Addr
+	pc_side->sendCmdArg(name); //Name
+	addr+=offset;
+	for(int i=0; i< offset; i++){
+		byte tmp = (byte *)addr;
+		pc_side->sendCmdBinArg<byte>(tmp);// Bunch of bytes containing the value
+		addr--;
+	}
 	pc_side->sendCmdEnd();
+}
+
+void add_update_debug_var(int data, bool var, const char name[]){
+	actual_add_update(data, sizeof(var), &var, name);
+}
+
+void add_update_debug_var(int data, byte var, const char name[]){
+	actual_add_update(data, sizeof(var), &var, name);
+}
+
+void add_update_debug_var(int data, char var, const char name[]){
+	actual_add_update(data, sizeof(var), &var, name);
+}
+
+void add_update_debug_var(int data, float var, const char name[]){
+	actual_add_update(data, sizeof(var), &var, name);
+}
+
+void add_update_debug_var(int data, double var, const char name[]){
+	actual_add_update(data, sizeof(var), &var, name);
+}
+
+void add_update_debug_var(int data, int var, const char name[]){
+	actual_add_update(data, sizeof(var), &var, name);
+}
+
+void add_update_debug_var(int data, long var, const char name[]){
+	actual_add_update(data, sizeof(var), &var, name);
+}	
+
+void add_update_debug_var(int data, short var, const char name[]){
+	actual_add_update(data, sizeof(var), &var, name);
+}
+
+void add_update_debug_var(int data, unsigned int var, const char name[]){
+	actual_add_update(data, sizeof(var), &var, name);
+}
+
+void add_update_debug_var(int data, unsigned short var, const char name[]){
+	actual_add_update(data, sizeof(var), &var, name);
+}
+
+void add_update_debug_var(int data, unsigned long var, const char name[]){
+	actual_add_update(data, sizeof(var), &var, name);
 }
 
 void send_debug_var_value(){
 	//We expect the variable address and type
-	int data = pc_side->readBinArg<int>();
-	unsigned int offset = pc_side->readBinArg<unsigned int>();
-	char buff[100]; // Magic, yikes
-	switch(data){
-		case char_var:{
-			char *value = (char *) offset;
-			sprintf(buff, "%c", *value);
-			break;
-		}
-		case float_var:{
-			float *value = (float *)offset;
-			dtostrf(*value, 15, 3, buff);
-			break;
-		}
-		case bool_var:
-		case byte_var:
-		case int_var:{
-			int *value = (int *)offset;
-			sprintf(buff, "%d", *value);
-			break;
-		}
-		case long_var:{
-			long *value = (long *)offset;
-			sprintf(buff, "%l", *value);
-			break;
-		}
-		case short_var:{
-			short *value = (short *)offset;
-			sprintf(buff, "%d", *value);
-			break;
-		}
-		case u_char_var:{
-			unsigned char *value = (unsigned char *)offset;
-			sprintf(buff, "%c", *value);
-			break;
-		}
-		case u_int_var:{
-			unsigned int *value = (unsigned int*)offset;
-			sprintf(buff, "%u", *value);
-			break;
-		}
-		case u_long_var:{
-			unsigned long *value = (unsigned long *)offset;
-			sprintf(buff, "%lu", *value);
-			break;
-		}
-		default:{
-			sprintf(buff, "error_type");
-			break;
-		}
+	int offset = pc_side->readBinArg<int>();
+	unsigned int tmp = pc_side->readBinArg<unsigned int>();
+	byte *addr = (byte *) tmp;
+	pc_side->sendCmdStart(answer_debug_var_value);
+	for(int i=0; i< offset; i++){
+		pc_side->sendCmdBinArg<byte>(*addr);
+		addr++;
 	}
-	pc_side->sendCmd(answer_debug_var_value, buff);
+	pc_side->sendCmdEnd();
+	//TODO: testing the function
+
 }

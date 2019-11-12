@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPlainTextEdit, \
-    QPushButton, QTableWidget, QHBoxLayout
+    QPushButton, QTableWidget, QHBoxLayout, QTableWidgetItem
 from PyQt5.QtCore import pyqtSlot
 
 
@@ -91,7 +91,7 @@ class CustomLogger(QWidget, logging.Handler):
 class UserVarsTable(QWidget):
     def __init__(self):
         QWidget.__init__(self, parent=None)
-        self.mainLayout = QVBoxLayout()
+        self.mainLayout = QHBoxLayout()
         self.ArduinoTable = QTableWidget()  # VarName | Value | Adress | Type?
         self.UserTable = QTableWidget()  # VarName | str(value) or math expression
 
@@ -112,8 +112,27 @@ class UserVarsTable(QWidget):
         # Set up layout and add widgets
         self.setLayout(self.mainLayout)
         self.layout().addWidget(self.ArduinoTable)
-        self.userTableContainer = QHBoxLayout()
-        self.userTableContainer.addWidget(self.UserTable)
-        self.userTableContainer.addLayout(button_container)
+        self.layout().addWidget(self.UserTable)
+        self.layout().addLayout(button_container)
 
-        # And now we fill the tables
+        # Delete
+        self.show()
+
+    def new_arduino_data(self, data):
+        append_row = self.ArduinoTable.rowCount()
+
+        for row in range(0, append_row):
+            item_tmp = self.ArduinoTable.item(row, 0)
+            if item_tmp.text() == data['name']:
+                value_item = self.ArduinoTable.item(row, 1)
+                value_item.setText(data['value'])
+                return
+        self.ArduinoTable.insertRow(append_row)
+        var_name_item = QTableWidgetItem(data['name'])
+        value_item = QTableWidgetItem(data['value'])
+        addr_item = QTableWidgetItem(data['addr'])
+        data_type_item = QTableWidgetItem(data['data_type'])
+        self.ArduinoTable.setItem(append_row, 0, var_name_item)
+        self.ArduinoTable.setItem(append_row, 1, value_item)
+        self.ArduinoTable.setItem(append_row, 2, addr_item)
+        self.ArduinoTable.setItem(append_row, 3, data_type_item)
