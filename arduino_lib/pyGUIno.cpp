@@ -40,11 +40,10 @@ void actual_add_update(int data, int offset, void *addr, const char name[]){
 	unsigned int tmp = (unsigned int) addr;
 	pc_side->sendCmdBinArg<unsigned int>(tmp); //Addr
 	pc_side->sendCmdArg(name); //Name
-	addr+=offset;
 	for(int i=0; i< offset; i++){
-		byte tmp = (byte *)addr;
-		pc_side->sendCmdBinArg<byte>(tmp);// Bunch of bytes containing the value
-		addr--;
+		byte *tmp = (byte *)addr;
+		pc_side->sendCmdBinArg<byte>(*tmp);// Bunch of bytes containing the value
+		addr++;
 	}
 	pc_side->sendCmdEnd();
 }
