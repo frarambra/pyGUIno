@@ -18,12 +18,13 @@ class PyGUIno:
         print("PyGUIno: Instantiating")
         self.app = QApplication(sys.argv)
         self.size = self.app.primaryScreen().size()
+        self.pin_dict = None
         mainwindow = QMainWindow()
         self.tmp = mainwindow  # Shenanigan cause I don't want to refractor
 
         # Set up mainwindow, parameters
         mainwindow.resize(self.size.width(), self.size.height())
-        mainwindow.setObjectName("MainWindow")
+        mainwindow.setObjectName("PyGUIno")
         self.centralwidget = QWidget(mainwindow)
         mainwindow.setCentralWidget(self.centralwidget)
         self.centralwidget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -74,8 +75,7 @@ class PyGUIno:
             data = json.load(fd)
             qaction = QAction(mainwindow)
             qaction.setText(data['meta']['ui'])
-            print(data['pin'])
-            qaction.triggered.connect(partial(self.set_pin_list, arg_data=data['pin']))
+            qaction.triggered.connect(partial(self.set_pin_dict, arg_data=data['pin']))
             self.menuBoards.addAction(qaction)
             fd.close()
 
@@ -144,21 +144,20 @@ class PyGUIno:
         pass
 
     def ini_graph_dialog(self):
-        if self.pin_list:
+        if self.pin_dict:
             print("BaseApp: Creating PlotForm")
-            Forms.PlotForm(self.widgetCoord, self.pin_list)
+            Forms.PlotForm(self.widgetCoord, self.pin_dict)
         else:
             error_msg = QErrorMessage()
             error_msg.showMessage("Please select a board first")
-            error_msg.show()
+            error_msg.exec_()
 
-    def set_pin_list(self, arg_data):
-        self.pin_list = arg_data
+    def set_pin_dict(self, arg_data):
+        self.pin_dict = arg_data
 
     def set_connform(self, args):
         print('BaseApp: Creating ConnectionForm')
-        self.connForm = Forms.ConnectionForm(args)
-    pass
+        Forms.ConnectionForm(args)
 
 
 class WidgetCoordinator:
@@ -303,15 +302,15 @@ class WidgetCoordinator:
                 print(err)
 
     # Widget related methods
-    def create_plot_widget(self, meta, plot_args):
-        plot_widget = CustomWidgets.WidgetPlot(meta, plot_args)
+    def create_plot_widget(self, conf_ui, conf_plots):
+        plot_widget = CustomWidgets.WidgetPlot(conf_ui, conf_plots)
         self.list_widgets.append(plot_widget)
-        self.PlotTabWidget.addTab(plot_widget, "")
+        self.PlotTabWidget.addTab(plot_widget, conf_ui['title'])
 
     def create_logger_widget(self, log_id):
         log_widget = CustomWidgets.CustomLogger(log_id=log_id)
         self.list_widgets.append(log_widget)
-        self.LoggerTabWidget.addTab(log_widget, "")
+        self.LoggerTabWidget.addTab(log_widget, log_id)
 
     def create_table_widget(self):
         # TODO: There won't be tabs for this, it's only temporal

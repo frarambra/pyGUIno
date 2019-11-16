@@ -51,7 +51,7 @@ class ConnectionForm(QtWidgets.QDialog):
         self.mainLayout.addWidget(self.formBox)
         self.mainLayout.addWidget(self.buttonBox)
         self.setLayout(self.mainLayout)
-        self.show()
+        self.exec_()
 
     @QtCore.pyqtSlot()
     def accept(self):
@@ -108,7 +108,7 @@ class ConnectionForm(QtWidgets.QDialog):
 
 
 class PlotForm(QtWidgets.QDialog):
-    def __init__(self, core, pin_list):
+    def __init__(self, core, pin_dict):
         QtWidgets.QDialog.__init__(self)
         print("PlotForm: Instantiating")
         self.setWindowTitle("Add new plot")
@@ -131,7 +131,7 @@ class PlotForm(QtWidgets.QDialog):
 
         # Attached functions to buttons
 
-        self.pin_list = pin_list
+        self.pin_dict = pin_dict
         add_button.clicked.connect(self.on_click_add)
 
         button_container = QtWidgets.QHBoxLayout()
@@ -162,13 +162,12 @@ class PlotForm(QtWidgets.QDialog):
         self.setLayout(self.mainLayout)
 
         # Show the form
-        self.show()  # For some reason isn't showing as ConnectionForm does
-        self.exec_()  # This little trick does the job though
+        self.exec_()
         print("PlotForm: Created")
 
     def on_click_add(self):
         # open a PinEvalDialog
-        PinEvalDialog(self, pin_list=self.pin_list)
+        PinEvalDialog(self, pin_dict=self.pin_dict)
 
     def add_new_row(self, pin_selected, eval_string):
         self.delete_button.setEnabled(True)
@@ -181,22 +180,22 @@ class PlotForm(QtWidgets.QDialog):
         self.qt_table.setItem(append_row, 1, tmp2)
 
     def accept(self):
-        n_columns = self.qt_table.columnCount()
-        n_rows = self.qt_table.rowCount()
-        plotting_data = []
-        for current_row in range(0, n_rows):
-            # TODO: When rewriting PlotWidget check this to fit the arguments
-            plotting_data_tmp = []
-            for i in range(0, n_columns):
-                item = self.qt_table.item(current_row, i)  # row, column
-                plotting_data_tmp.append(item.text())
-            plotting_data.append(plotting_data_tmp)
-
-        # Call the core to instantiate the PlotWidget
-        meta = dict()
-        meta['title'] = self.lineedit1.text()
         try:
-            self.coreRef.create_plot_widget(meta, plotting_data)
+            n_rows = self.qt_table.rowCount()
+            conf_plt_pins = []
+            for current_row in range(0, n_rows):
+                tmp1 = self.qt_table.item(current_row, 0)
+                tmp2 = self.qt_table.item(current_row, 1)
+                if tmp1 and tmp2:
+                    pin_key = tmp1.text()
+                    pin_number = self.pin_dict[pin_key]
+                    math_expression = tmp2.text()
+                    conf_plt_pins.append((pin_number, math_expression))
+
+            # Call the core to instantiate the PlotWidget
+            general_config = dict()
+            general_config['title'] = self.lineedit1.text()
+            self.coreRef.create_plot_widget(general_config, conf_plt_pins)
         except Exception as err:
             print(err)
         finally:
@@ -204,7 +203,7 @@ class PlotForm(QtWidgets.QDialog):
 
 
 class PinEvalDialog(QtWidgets.QDialog):
-    def __init__(self, form_to_notify, pin_list):
+    def __init__(self, form_to_notify, pin_dict):
         QtWidgets.QDialog.__init__(self)
         self.setWindowTitle(" ")
         self.setFixedWidth(300)
@@ -214,7 +213,8 @@ class PinEvalDialog(QtWidgets.QDialog):
         qlabel2 = QtWidgets.QLabel("Expression to value:")
 
         self.pin_selector = QtWidgets.QComboBox()
-        for pin_id in pin_list:  # [0,1,2,...,A0,A1,A2,..]
+
+        for pin_id in sorted(pin_dict.keys()):
             self.pin_selector.addItem(str(pin_id))
         self.to_evaluate = QtWidgets.QLineEdit()
 

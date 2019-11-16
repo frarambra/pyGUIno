@@ -1,8 +1,6 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPlainTextEdit, \
     QPushButton, QTableWidget, QHBoxLayout, QTableWidgetItem, QDialog, QComboBox, QLineEdit, QDialogButtonBox, \
     QFormLayout
-from PyQt5.QtCore import pyqtSlot
-
 
 import pyqtgraph as pg
 import time
@@ -11,9 +9,8 @@ import logging
 
 # TODO: Avoid the y axis move that much when several pins are being plotted
 class WidgetPlot(QWidget):
-    def __init__(self, meta, pin_and_eval):
+    def __init__(self, configuration_data, config_plt_data):
         QWidget.__init__(self)
-        # haria falta un formulario para escoger la posicion en el grid o bastaria con un "drag and drop"
         pg.setConfigOption('background', 'w')
         pg.setConfigOption('foreground', 'k')
         self.setLayout(QVBoxLayout())
@@ -23,11 +20,11 @@ class WidgetPlot(QWidget):
         self.contained_plots = []
         self.t_ini = time.time()
         # Set title and such from "meta"
-        print(pin_and_eval)
 
-        for tmp in pin_and_eval:
+        for tmp in config_plt_data:
+            print('tmp: {}'.format(tmp))
             plt_item = self.plot_widget.getPlotItem()
-            plt_aux_tmp = self.PltAux(pin=tmp[0], plt_item=plt_item)
+            plt_aux_tmp = self.PltAux(pin=tmp[0], math_expression=tmp[1], plt_item=plt_item)
             self.contained_plots.append(plt_aux_tmp)
 
     def new_data(self, data, timestamp):
@@ -37,19 +34,21 @@ class WidgetPlot(QWidget):
             if plt_aux.pin == str(pin):
                 plt_aux.update(timestamp-self.t_ini, value)
 
-    # TODO: Implement evaluation function with either exec or eval
     class PltAux:
-        def __init__(self, pin, plt_item):
+        def __init__(self, pin, math_expression, plt_item):
             # Length must match
             self.limit = 500
             self.pin = pin
             self.plt_item = plt_item
+            self.math_expression = math_expression
             self.time_axe = []
             self.value_axe = []
 
         def update(self, ts, value):
             self.shift(ts, value)
             self.plt_item.clear()
+            # TODO: Implement here the evaluation part
+
             self.plt_item.plot(self.time_axe, self.value_axe)
 
         def shift(self, ts, value):
@@ -154,7 +153,6 @@ class UserVarsTable(QWidget):
         except Exception as err:
             print(err)
 
-# TODO: IMPORTANTE QUIZAS LA FORMA DE SALVAR EL TEMA CUSTOM VARIABLES SEA MEDIANTE FORMAT STRINGS
     def delete_from_user_vars(self, key):
         if key in self.user_vars.keys():
             del self.user_vars[key]
