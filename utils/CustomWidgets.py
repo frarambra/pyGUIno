@@ -1,5 +1,6 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPlainTextEdit, \
-    QPushButton, QTableWidget, QHBoxLayout, QTableWidgetItem
+    QPushButton, QTableWidget, QHBoxLayout, QTableWidgetItem, QDialog, QComboBox, QLineEdit, QDialogButtonBox, \
+    QFormLayout
 from PyQt5.QtCore import pyqtSlot
 
 
@@ -8,6 +9,7 @@ import time
 import logging
 
 
+# TODO: Avoid the y axis move that much when several pins are being plotted
 class WidgetPlot(QWidget):
     def __init__(self, meta, pin_and_eval):
         QWidget.__init__(self)
@@ -21,6 +23,7 @@ class WidgetPlot(QWidget):
         self.contained_plots = []
         self.t_ini = time.time()
         # Set title and such from "meta"
+        print(pin_and_eval)
 
         for tmp in pin_and_eval:
             plt_item = self.plot_widget.getPlotItem()
@@ -38,7 +41,7 @@ class WidgetPlot(QWidget):
     class PltAux:
         def __init__(self, pin, plt_item):
             # Length must match
-            self.limit = 1000
+            self.limit = 500
             self.pin = pin
             self.plt_item = plt_item
             self.time_axe = []
@@ -89,14 +92,18 @@ class CustomLogger(QWidget, logging.Handler):
 
 
 class UserVarsTable(QWidget):
-    def __init__(self):
+    def __init__(self, user_vars):
         QWidget.__init__(self, parent=None)
         self.mainLayout = QHBoxLayout()
         self.ArduinoTable = QTableWidget()  # VarName | Value | Adress | Type?
         self.UserTable = QTableWidget()  # VarName | str(value) or math expression
+        self.user_vars = user_vars
 
         self.ArduinoTable.setColumnCount(4)
+        self.ArduinoTable.setRowCount(0)
         self.UserTable.setColumnCount(2)
+        self.UserTable.setRowCount(0)
+
         self.ArduinoTable.setHorizontalHeaderLabels(['Arduino variables', 'Value', 'Address', 'Data Type'])
         self.UserTable.setHorizontalHeaderLabels(['User variables', 'Value'])
 
@@ -105,6 +112,10 @@ class UserVarsTable(QWidget):
         self.add_button = QPushButton('Add')
         self.delete_button = QPushButton('Delete')
         self.modify_button = QPushButton('Modify')
+
+        self.add_button.clicked.connect(self.open_add_dialog)
+        self.delete_button.clicked.connect(self.delete_from_user_vars)
+
         button_container.addWidget(self.add_button)
         button_container.addWidget(self.delete_button)
         button_container.addWidget(self.modify_button)
@@ -125,14 +136,94 @@ class UserVarsTable(QWidget):
             item_tmp = self.ArduinoTable.item(row, 0)
             if item_tmp.text() == data['name']:
                 value_item = self.ArduinoTable.item(row, 1)
-                value_item.setText(data['value'])
+                value_item.setText(str(data['value']))
                 return
         self.ArduinoTable.insertRow(append_row)
-        var_name_item = QTableWidgetItem(data['name'])
-        value_item = QTableWidgetItem(data['value'])
-        addr_item = QTableWidgetItem(data['addr'])
-        data_type_item = QTableWidgetItem(data['data_type'])
+        var_name_item = QTableWidgetItem(str(data['name']))
+        value_item = QTableWidgetItem(str(data['value']))
+        addr_item = QTableWidgetItem(hex(data['addr']))
+        data_type_item = QTableWidgetItem(str(data['data_type']))
         self.ArduinoTable.setItem(append_row, 0, var_name_item)
         self.ArduinoTable.setItem(append_row, 1, value_item)
         self.ArduinoTable.setItem(append_row, 2, addr_item)
         self.ArduinoTable.setItem(append_row, 3, data_type_item)
+
+    def open_add_dialog(self):
+        try:
+            self.AddUserVarMenu(self.UserTable, self.user_vars)
+        except Exception as err:
+            print(err)
+
+# TODO: IMPORTANTE QUIZAS LA FORMA DE SALVAR EL TEMA CUSTOM VARIABLES SEA MEDIANTE FORMAT STRINGS
+    def delete_from_user_vars(self, key):
+        if key in self.user_vars.keys():
+            del self.user_vars[key]
+
+    def modify_user_var(self, key, new_value):
+        if key in self.user_vars.keys():
+            if self.check_expression(new_value):
+                try:
+                    int(new_value)
+                except ValueError:
+                    try:
+                        float(new_value)
+                    except ValueError:
+                        # Show message error
+                        pass
+                else:
+                    self.user_vars[key] = new_value
+
+    class AddUserVarMenu(QDialog):
+        def __init__(self, user_table, user_dict):
+            QDialog.__init__(self)
+            self.user_table = user_table
+            self.user_dict = user_dict
+
+            self.setWindowTitle(" ")
+            self.setFixedWidth(300)
+            self.setFixedHeight(150)
+
+            qlabel1 = QLabel("Variable name:")
+            qlabel2 = QLabel("Variable value:")
+
+            self.var_name = QLineEdit()
+            self.var_value = QLineEdit()
+
+            button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+            button_box.rejected.connect(self.reject)
+            button_box.accepted.connect(self.add_to_user_vars)
+
+            main_layout = QVBoxLayout()
+            form_layout = QFormLayout()
+            form_layout.addRow(qlabel1, self.var_name)
+            form_layout.addRow(qlabel2, self.var_value)
+            main_layout.addLayout(form_layout)
+            main_layout.addWidget(button_box)
+            self.setLayout(main_layout)
+
+            self.show()
+            self.exec_()
+
+        def add_to_user_vars(self):
+            key = self.var_name.text()
+            value = self.var_value.text()
+
+            if key not in self.user_dict.keys():
+                # Check if it's an integer then a float
+                try:
+                    float(value)
+                except ValueError as err:
+                    # This aint a number, show error message
+                    print(err)
+                else:
+                    # Add to dictionary and update table
+                    self.user_dict[key] = value
+                    append_row = self.user_table.rowCount()
+                    self.user_table.insertRow(append_row)
+                    item_name = QTableWidgetItem(key)
+                    item_value = QTableWidgetItem(value)
+                    self.user_table.setItem(append_row, 0, item_name)
+                    self.user_table.setItem(append_row, 1, item_value)
+                finally:
+                    print(self.user_dict)
+                    super().accept()

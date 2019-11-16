@@ -32,7 +32,7 @@ class PyGUIno:
 
         # Instantiate WidgetCoordinator
         self.widgetCoord = WidgetCoordinator(central_widget=self.centralwidget,
-                                             comm_args=None, size=self.size)
+                                             comm_args=None, size=self.size, user_vars=None)
 
         # Set up menuBar
         self.menubar = QMenuBar(mainwindow)
@@ -162,17 +162,13 @@ class PyGUIno:
 
 
 class WidgetCoordinator:
-
-    table_sig = pyqtSignal(dict)
-
-    def __init__(self, central_widget, comm_args, size):
+    def __init__(self, central_widget, comm_args, size, user_vars):
         print("WidgetCoordinator: Instantiating")
         # Class attributes
         width = size.width()
         height = size.height()
-        self.non_free_spots = []
         self.list_widgets = []
-        self.debug_var = []
+        self.user_vars = dict()
         self.commands = [
             ["ack_start", "s"],  # To recieve: With this we will be aware when the communication has started
             ["request_pin", "i"],  # To send: First arg will be the number of pins to start tracking then the pin number
@@ -187,6 +183,11 @@ class WidgetCoordinator:
         # Start communication
         if comm_args:
             self.set_comm(comm_args=comm_args)
+        if user_vars:
+            self.user_vars = user_vars
+        else:
+            self.user_vars = dict()
+
 
         # Create loggers
         logs = ['I2C', 'SPI', 'SERIAL']
@@ -271,7 +272,7 @@ class WidgetCoordinator:
                     widget.new_data(data=payload, timestamp=ts)
         elif command == self.commands[5][0]:  # arduino_transmit_debug_var
             try:
-                dict_to_emit = dict()
+                row_as_dict = dict()
                 list_index = payload[0]
                 type_list = [
                     # TODO: check every data type properly works
@@ -289,21 +290,19 @@ class WidgetCoordinator:
                 ]
                 # type of data, memory address, human identifier
                 to_python_data = type_list[list_index][0]
-                dict_to_emit['data_type'] = type_list[list_index][1]
-                dict_to_emit['addr'] = payload[1]
-                dict_to_emit['name'] = payload[2]
-                tmp = to_python_data(bytes(payload[3:]))
-                print(tmp)
-                dict_to_emit['value'] = tmp
+                row_as_dict['data_type'] = type_list[list_index][1]
+                row_as_dict['addr'] = payload[1]
+                row_as_dict['name'] = payload[2]
+                row_as_dict['value'] = to_python_data(bytes(payload[3:]))
+
+                for widget in self.list_widgets:
+                    if isinstance(widget, CustomWidgets.UserVarsTable):
+                        widget.new_arduino_data(row_as_dict)
+
             except Exception as err:
                 print(err)
 
     # Widget related methods
-    @staticmethod
-    def logger_notify(name, data):
-        log = logging.getLogger(name)
-        log.info(data)
-
     def create_plot_widget(self, meta, plot_args):
         plot_widget = CustomWidgets.WidgetPlot(meta, plot_args)
         self.list_widgets.append(plot_widget)
@@ -316,7 +315,7 @@ class WidgetCoordinator:
 
     def create_table_widget(self):
         # TODO: There won't be tabs for this, it's only temporal
-        table_widget = CustomWidgets.UserVarsTable()
+        table_widget = CustomWidgets.UserVarsTable(self.user_vars)
         self.list_widgets.append(table_widget)
         self.TableTabWidget.addTab(table_widget, "")
 
