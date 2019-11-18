@@ -190,7 +190,7 @@ class PlotForm(QtWidgets.QDialog):
                     pin_key = tmp1.text()
                     pin_number = self.pin_dict[pin_key]
                     math_expression = tmp2.text()
-                    conf_plt_pins.append((pin_number, math_expression))
+                    conf_plt_pins.append((pin_key, pin_number, math_expression))
 
             # Call the core to instantiate the PlotWidget
             general_config = dict()

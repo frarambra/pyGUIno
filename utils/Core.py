@@ -155,7 +155,8 @@ class PyGUIno:
     def set_pin_dict(self, arg_data):
         self.pin_dict = arg_data
 
-    def set_connform(self, args):
+    @staticmethod
+    def set_connform(args):
         print('BaseApp: Creating ConnectionForm')
         Forms.ConnectionForm(args)
 
@@ -186,7 +187,6 @@ class WidgetCoordinator:
             self.user_vars = user_vars
         else:
             self.user_vars = dict()
-
 
         # Create loggers
         logs = ['I2C', 'SPI', 'SERIAL']
@@ -270,40 +270,38 @@ class WidgetCoordinator:
                 if isinstance(widget, CustomWidgets.WidgetPlot):
                     widget.new_data(data=payload, timestamp=ts)
         elif command == self.commands[5][0]:  # arduino_transmit_debug_var
-            try:
-                row_as_dict = dict()
-                list_index = payload[0]
-                type_list = [
-                    # TODO: check every data type properly works
-                    (self.comm._recv_bool, 'bool'),
-                    (self.comm._recv_byte, 'byte'),
-                    (self.comm._recv_char, 'char'),
-                    (self.comm._recv_float, 'float'),
-                    (self.comm._recv_double, 'double'),  # 8 in Arduino Due
-                    (self.comm._recv_int, 'int'),  # 4 on Due, Zero...
-                    (self.comm._recv_long, 'long'),
-                    (self.comm._recv_int, 'short'),
-                    (self.comm._recv_unsigned_int, 'unsigned int'),  # 4 on Due
-                    (self.comm._recv_unsigned_int, 'unsigned short'),
-                    (self.comm._recv_unsigned_long, 'unsigned long')
-                ]
-                # type of data, memory address, human identifier
-                to_python_data = type_list[list_index][0]
-                row_as_dict['data_type'] = type_list[list_index][1]
-                row_as_dict['addr'] = payload[1]
-                row_as_dict['name'] = payload[2]
-                row_as_dict['value'] = to_python_data(bytes(payload[3:]))
+            row_as_dict = dict()
+            list_index = payload[0]
+            type_list = [
+                # TODO: check every data type properly works
+                (self.comm._recv_bool, 'bool'),
+                (self.comm._recv_byte, 'byte'),
+                (self.comm._recv_char, 'char'),
+                (self.comm._recv_float, 'float'),
+                (self.comm._recv_double, 'double'),  # 8 in Arduino Due
+                (self.comm._recv_int, 'int'),  # 4 on Due, Zero...
+                (self.comm._recv_long, 'long'),
+                (self.comm._recv_int, 'short'),
+                (self.comm._recv_unsigned_int, 'unsigned int'),  # 4 on Due
+                (self.comm._recv_unsigned_int, 'unsigned short'),
+                (self.comm._recv_unsigned_long, 'unsigned long')
+            ]
+            # type of data, memory address, human identifier
+            to_python_data = type_list[list_index][0]
+            row_as_dict['data_type'] = type_list[list_index][1]
+            row_as_dict['addr'] = payload[1]
+            row_as_dict['name'] = payload[2]
+            row_as_dict['value'] = to_python_data(bytes(payload[3:]))
+            for widget in self.list_widgets:
+                if isinstance(widget, CustomWidgets.UserVarsTable):
+                    widget.new_arduino_data(row_as_dict)
 
-                for widget in self.list_widgets:
-                    if isinstance(widget, CustomWidgets.UserVarsTable):
-                        widget.new_arduino_data(row_as_dict)
-
-            except Exception as err:
-                print(err)
 
     # Widget related methods
     def create_plot_widget(self, conf_ui, conf_plots):
-        plot_widget = CustomWidgets.WidgetPlot(conf_ui, conf_plots)
+        plot_widget = CustomWidgets.WidgetPlot(configuration_data=conf_ui,
+                                               config_plt_data=conf_plots,
+                                               user_dict_ref=self.user_vars)
         self.list_widgets.append(plot_widget)
         self.PlotTabWidget.addTab(plot_widget, conf_ui['title'])
 

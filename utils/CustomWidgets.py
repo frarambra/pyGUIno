@@ -9,8 +9,9 @@ import logging
 
 # TODO: Avoid the y axis move that much when several pins are being plotted
 class WidgetPlot(QWidget):
-    def __init__(self, configuration_data, config_plt_data):
+    def __init__(self, configuration_data, config_plt_data, user_dict_ref):
         QWidget.__init__(self)
+
         pg.setConfigOption('background', 'w')
         pg.setConfigOption('foreground', 'k')
         self.setLayout(QVBoxLayout())
@@ -18,45 +19,58 @@ class WidgetPlot(QWidget):
         self.layout().addWidget(self.plot_widget)
 
         self.contained_plots = []
-        self.t_ini = time.time()
+        self.resources = dict()
         # Set title and such from "meta"
 
         for tmp in config_plt_data:
-            print('tmp: {}'.format(tmp))
             plt_item = self.plot_widget.getPlotItem()
-            plt_aux_tmp = self.PltAux(pin=tmp[0], math_expression=tmp[1], plt_item=plt_item)
+            plt_aux_tmp = self.PltAux(pin_key=tmp[0], pin_number=tmp[1], math_expression=tmp[2], plt_item=plt_item)
+            self.resources[tmp[0]] = tmp[1]
             self.contained_plots.append(plt_aux_tmp)
+
+        self.user_dict_ref = user_dict_ref
 
     def new_data(self, data, timestamp):
         pin = data[0]
         value = data[1]
+
         for plt_aux in self.contained_plots:
-            if plt_aux.pin == str(pin):
-                plt_aux.update(timestamp-self.t_ini, value)
+            if plt_aux.pin == pin:
+                # Get pin_id by pin_number
+                # print(list(mydict.keys())[list(mydict.values()).index(16)])
+                pin_key = list(self.resources.keys())[list(self.resources.values()).index(pin)]
+                tmp_dict = self.user_dict_ref.copy()
+                tmp_dict[pin_key] = value
+                plt_aux.update(timestamp, value, tmp_dict)
 
     class PltAux:
-        def __init__(self, pin, math_expression, plt_item):
+        def __init__(self, pin_key, pin_number, math_expression, plt_item):
             # Length must match
             self.limit = 500
-            self.pin = pin
+            self.t_ini = time.time()
+            self.pin_key = pin_key
+            self.pin = pin_number
             self.plt_item = plt_item
             self.math_expression = math_expression
             self.time_axe = []
             self.value_axe = []
 
-        def update(self, ts, value):
-            self.shift(ts, value)
-            self.plt_item.clear()
-            # TODO: Implement here the evaluation part
-
-            self.plt_item.plot(self.time_axe, self.value_axe)
-
-        def shift(self, ts, value):
+        def update(self, ts, value, dict_user_ref):
             if len(self.time_axe) >= self.limit:
                 self.time_axe.pop(0)
                 self.value_axe.pop(0)
-            self.time_axe.append(ts)
-            self.value_axe.append(value)
+            # Eval and add to the axis
+            try:
+                if self.math_expression != "":
+                    value = eval(self.math_expression.format_map(dict_user_ref))
+            except SystemError as err:
+                print('Error on eval, showing raw data')
+                print(err)
+            finally:
+                self.time_axe.append(ts-self.t_ini)
+                self.value_axe.append(value)
+                self.plt_item.clear()
+                self.plt_item.plot(self.time_axe, self.value_axe)
 
 
 class CustomLogger(QWidget, logging.Handler):
@@ -131,6 +145,7 @@ class UserVarsTable(QWidget):
     def new_arduino_data(self, data):
         append_row = self.ArduinoTable.rowCount()
 
+        # Update table
         for row in range(0, append_row):
             item_tmp = self.ArduinoTable.item(row, 0)
             if item_tmp.text() == data['name']:
@@ -146,6 +161,9 @@ class UserVarsTable(QWidget):
         self.ArduinoTable.setItem(append_row, 1, value_item)
         self.ArduinoTable.setItem(append_row, 2, addr_item)
         self.ArduinoTable.setItem(append_row, 3, data_type_item)
+
+        # Update user_dict
+        self.user_vars[data['name']] = data['value']
 
     def open_add_dialog(self):
         try:
