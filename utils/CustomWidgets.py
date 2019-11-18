@@ -1,6 +1,7 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPlainTextEdit, \
     QPushButton, QTableWidget, QHBoxLayout, QTableWidgetItem, QDialog, QComboBox, QLineEdit, QDialogButtonBox, \
-    QFormLayout
+    QFormLayout, QAbstractItemView, QHeaderView
+from PyQt5 import QtCore
 
 import pyqtgraph as pg
 import time
@@ -95,13 +96,8 @@ class CustomLogger(QWidget, logging.Handler):
         self.layout().addWidget(self.loggerText)
 
     def emit(self, record):
-        try:
-            msg = record.getMessage()
-            splitted_record = msg.split('\\')
-            if splitted_record[0] == self.log_id:
-                self.loggerText.appendPlainText(splitted_record[1])
-        except Exception as err:
-            print(err)
+        msg = record.getMessage()
+        self.loggerText.appendPlainText(msg)
 
 
 class UserVarsTable(QWidget):
@@ -110,6 +106,7 @@ class UserVarsTable(QWidget):
         self.mainLayout = QHBoxLayout()
         self.ArduinoTable = QTableWidget()  # VarName | Value | Adress | Type?
         self.UserTable = QTableWidget()  # VarName | str(value) or math expression
+        self._selected_row = None
         self.user_vars = user_vars
 
         self.ArduinoTable.setColumnCount(4)
@@ -117,8 +114,22 @@ class UserVarsTable(QWidget):
         self.UserTable.setColumnCount(2)
         self.UserTable.setRowCount(0)
 
+        # Configure the table settings
         self.ArduinoTable.setHorizontalHeaderLabels(['Arduino variables', 'Value', 'Address', 'Data Type'])
         self.UserTable.setHorizontalHeaderLabels(['User variables', 'Value'])
+
+        self.UserTable.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.UserTable.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.ArduinoTable.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.ArduinoTable.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.ArduinoTable.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        self.ArduinoTable.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
+
+        self.ArduinoTable.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.UserTable.setEditTriggers(QAbstractItemView.NoEditTriggers)
+
+        # Add event handlers
+        self.UserTable.itemClicked.connect(self.selected_row)
 
         # Set of buttons for UserTable, use some sort of icons, +, crank, -
         button_container = QVBoxLayout()
@@ -139,7 +150,6 @@ class UserVarsTable(QWidget):
         self.layout().addWidget(self.UserTable)
         self.layout().addLayout(button_container)
 
-        # Delete
         self.show()
 
     def new_arduino_data(self, data):
@@ -172,8 +182,12 @@ class UserVarsTable(QWidget):
             print(err)
 
     def delete_from_user_vars(self, key):
-        if key in self.user_vars.keys():
+        print('Deleting started')
+        if self._selected_row and bool(self.user_vars):
+            key = self.UserTable.item(self._selected_row, 0)
             del self.user_vars[key]
+            print('User_vars: {}'.format(self.user_vars))
+            self.UserTable.removeRow(self._selected_row)
 
     def modify_user_var(self, key, new_value):
         if key in self.user_vars.keys():
@@ -188,6 +202,11 @@ class UserVarsTable(QWidget):
                         pass
                 else:
                     self.user_vars[key] = new_value
+
+    def selected_row(self, item):
+        self.UserTable.selectRow(item.row())
+        self._selected_row = item.row()+1  # Shenanigan
+        print('Selected row: {}'.format(self._selected_row))
 
     class AddUserVarMenu(QDialog):
         def __init__(self, user_table, user_dict):

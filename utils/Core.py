@@ -257,7 +257,7 @@ class WidgetCoordinator:
 
     def handle_new_data(self, msg):
         input_log = logging.getLogger('SERIAL')
-        input_log.info("SERIAL\\In: {}".format(msg))
+        input_log.info(msg)
 
         command = msg[0]
         payload = msg[1]
