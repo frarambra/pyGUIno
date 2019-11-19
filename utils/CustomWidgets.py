@@ -182,12 +182,12 @@ class UserVarsTable(QWidget):
             print(err)
 
     def delete_from_user_vars(self, key):
-        print('Deleting started')
         if self._selected_row and bool(self.user_vars):
-            key = self.UserTable.item(self._selected_row, 0)
+            actual_row = self._selected_row-1
+            key = self.UserTable.item(actual_row, 0).text()
+            self.UserTable.removeRow(actual_row)
             del self.user_vars[key]
-            print('User_vars: {}'.format(self.user_vars))
-            self.UserTable.removeRow(self._selected_row)
+            self._selected_row = None
 
     def modify_user_var(self, key, new_value):
         if key in self.user_vars.keys():
