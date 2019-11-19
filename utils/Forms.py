@@ -6,8 +6,8 @@ import re
 
 class ConnectionForm(QtWidgets.QDialog):
     def __init__(self, args):
-        print("ConnectionForm: Instanciando")
         QtWidgets.QDialog.__init__(self)
+        self.setWindowFlags(QtCore.Qt.CustomizeWindowHint | QtCore.Qt.WindowCloseButtonHint)
         self.selected = args['type']
         self.core = args['core']
         self.buttonBox = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
@@ -69,9 +69,7 @@ class ConnectionForm(QtWidgets.QDialog):
             super().accept()
 
         else:
-            error_msg = QtWidgets.QErrorMessage()
-            error_msg.showMessage("Error en los argumentos")
-            error_msg.exec_()
+            ErrorMessageWrapper('Connection Error', 'Error in the arguments')
 
     @staticmethod
     def validate_input(comm_args):
@@ -86,13 +84,10 @@ class ConnectionForm(QtWidgets.QDialog):
             return False
 
         else:  # TODO change to elif comm_args['type'] == 'Wifi': | Isn't working elif for some reason
-            print('Validando los datos')
             valid_ip_address = "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$"
             if re.match(valid_ip_address, comm_args['ip']):
-                print('Regex bueno')
                 try:
                     port_number = int(comm_args['port'])
-                    print('port number {}'.format(port_number))
                     if 0 < port_number <= 65535:
                         return True
                 except ValueError:
@@ -103,9 +98,11 @@ class ConnectionForm(QtWidgets.QDialog):
         return False
 
 
+# TODO: Support for debug vars too
 class PlotForm(QtWidgets.QDialog):
     def __init__(self, core, pin_dict):
         QtWidgets.QDialog.__init__(self)
+        self.setWindowFlags(QtCore.Qt.CustomizeWindowHint | QtCore.Qt.WindowCloseButtonHint)
         self._color_dict = {'r': 'red',
                             'g': 'green',
                             'b': 'blue',
@@ -169,7 +166,6 @@ class PlotForm(QtWidgets.QDialog):
 
         # Show the form
         self.exec_()
-        print("PlotForm: Created")
 
     def on_click_add(self):
         # open a PinEvalDialog
@@ -216,7 +212,7 @@ class PlotForm(QtWidgets.QDialog):
 class PinEvalDialog(QtWidgets.QDialog):
     def __init__(self, form_to_notify, pin_dict, color_dict):
         QtWidgets.QDialog.__init__(self)
-
+        self.setWindowFlags(QtCore.Qt.CustomizeWindowHint | QtCore.Qt.WindowCloseButtonHint)
         self.setWindowTitle(" ")
         self.setFixedWidth(300)
         self.setFixedHeight(150)
@@ -257,3 +253,21 @@ class PinEvalDialog(QtWidgets.QDialog):
         # Handle adquired data to the PlotForm object
         form_to_notify.add_new_row(pin_selected, eval_string, color_selected)
         super().accept()
+
+
+class ErrorMessageWrapper:
+    # A singleton approach to avoid bombing the user with
+    # error windows
+    instance = None
+
+    def __init__(self, err_title, err_str):
+        if not ErrorMessageWrapper.instance:
+            ErrorMessageWrapper.instance = ErrorMessageWrapper.ErrorMessage(err_title, err_str)
+
+    class ErrorMessage(QtWidgets.QErrorMessage):
+        def __init__(self, err_title, err_str):
+            QtWidgets.QErrorMessage.__init__(self)
+            self.setWindowFlags(QtCore.Qt.CustomizeWindowHint | QtCore.Qt.WindowCloseButtonHint)
+            self.setWindowTitle(err_title)
+            self.showMessage(err_str)
+            self.exec_()

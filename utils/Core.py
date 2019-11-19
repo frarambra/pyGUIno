@@ -273,7 +273,6 @@ class WidgetCoordinator:
             row_as_dict = dict()
             list_index = payload[0]
             type_list = [
-                # TODO: check every data type properly works
                 (self.comm._recv_bool, 'bool'),
                 (self.comm._recv_byte, 'byte'),
                 (self.comm._recv_char, 'char'),
@@ -287,15 +286,19 @@ class WidgetCoordinator:
                 (self.comm._recv_unsigned_long, 'unsigned long')
             ]
             # type of data, memory address, human identifier
-            to_python_data = type_list[list_index][0]
-            row_as_dict['data_type'] = type_list[list_index][1]
-            row_as_dict['addr'] = payload[1]
-            row_as_dict['name'] = payload[2]
-            row_as_dict['value'] = to_python_data(bytes(payload[3:]))
-            for widget in self.list_widgets:
-                if isinstance(widget, CustomWidgets.UserVarsTable):
-                    widget.new_arduino_data(row_as_dict)
-
+            try:
+                to_python_data = type_list[list_index][0]
+                row_as_dict['data_type'] = type_list[list_index][1]
+                row_as_dict['addr'] = payload[1]
+                row_as_dict['name'] = payload[2]
+                row_as_dict['value'] = to_python_data(bytes(payload[3:]))
+                for widget in self.list_widgets:
+                    if isinstance(widget, CustomWidgets.UserVarsTable):
+                        widget.new_arduino_data(row_as_dict)
+            except Exception as err:
+                print(err)
+                # TODO: Write the error message properly
+                Forms.ErrorMessageWrapper('Debug Variable Error', 'tmp')
 
     # Widget related methods
     def create_plot_widget(self, conf_ui, conf_plots):
