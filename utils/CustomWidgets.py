@@ -25,7 +25,9 @@ class WidgetPlot(QWidget):
 
         for tmp in config_plt_data:
             plt_item = self.plot_widget.getPlotItem()
-            plt_aux_tmp = self.PltAux(pin_key=tmp[0], pin_number=tmp[1], math_expression=tmp[2], plt_item=plt_item)
+            plt_aux_tmp = self.PltAux(pin_key=tmp[0], pin_number=tmp[1],
+                                      math_expression=tmp[2], color= tmp[3],
+                                      plt_item=plt_item)
             self.resources[tmp[0]] = tmp[1]
             self.contained_plots.append(plt_aux_tmp)
 
@@ -38,14 +40,13 @@ class WidgetPlot(QWidget):
         for plt_aux in self.contained_plots:
             if plt_aux.pin == pin:
                 # Get pin_id by pin_number
-                # print(list(mydict.keys())[list(mydict.values()).index(16)])
                 pin_key = list(self.resources.keys())[list(self.resources.values()).index(pin)]
                 tmp_dict = self.user_dict_ref.copy()
                 tmp_dict[pin_key] = value
                 plt_aux.update(timestamp, value, tmp_dict)
 
     class PltAux:
-        def __init__(self, pin_key, pin_number, math_expression, plt_item):
+        def __init__(self, pin_key, pin_number, math_expression, color, plt_item):
             # Length must match
             self.limit = 500
             self.t_ini = time.time()
@@ -53,6 +54,7 @@ class WidgetPlot(QWidget):
             self.pin = pin_number
             self.plt_item = plt_item
             self.math_expression = math_expression
+            self.color = color
             self.time_axe = []
             self.value_axe = []
 
@@ -71,7 +73,8 @@ class WidgetPlot(QWidget):
                 self.time_axe.append(ts-self.t_ini)
                 self.value_axe.append(value)
                 self.plt_item.clear()
-                self.plt_item.plot(self.time_axe, self.value_axe)
+                self.plt_item.plot(self.time_axe, self.value_axe,
+                                   pen=self.color)
 
 
 class CustomLogger(QWidget, logging.Handler):
@@ -135,14 +138,12 @@ class UserVarsTable(QWidget):
         button_container = QVBoxLayout()
         self.add_button = QPushButton('Add')
         self.delete_button = QPushButton('Delete')
-        self.modify_button = QPushButton('Modify')
 
         self.add_button.clicked.connect(self.open_add_dialog)
         self.delete_button.clicked.connect(self.delete_from_user_vars)
 
         button_container.addWidget(self.add_button)
         button_container.addWidget(self.delete_button)
-        button_container.addWidget(self.modify_button)
 
         # Set up layout and add widgets
         self.setLayout(self.mainLayout)
@@ -154,7 +155,6 @@ class UserVarsTable(QWidget):
 
     def new_arduino_data(self, data):
         append_row = self.ArduinoTable.rowCount()
-
         # Update table
         for row in range(0, append_row):
             item_tmp = self.ArduinoTable.item(row, 0)
@@ -181,27 +181,13 @@ class UserVarsTable(QWidget):
         except Exception as err:
             print(err)
 
-    def delete_from_user_vars(self, key):
+    def delete_from_user_vars(self):
         if self._selected_row and bool(self.user_vars):
             actual_row = self._selected_row-1
             key = self.UserTable.item(actual_row, 0).text()
             self.UserTable.removeRow(actual_row)
             del self.user_vars[key]
             self._selected_row = None
-
-    def modify_user_var(self, key, new_value):
-        if key in self.user_vars.keys():
-            if self.check_expression(new_value):
-                try:
-                    int(new_value)
-                except ValueError:
-                    try:
-                        float(new_value)
-                    except ValueError:
-                        # Show message error
-                        pass
-                else:
-                    self.user_vars[key] = new_value
 
     def selected_row(self, item):
         self.UserTable.selectRow(item.row())
