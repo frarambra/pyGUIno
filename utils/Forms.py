@@ -1,6 +1,7 @@
 from PyQt5 import QtWidgets, QtCore
 from serial.tools.list_ports import comports
 from functools import partial
+import bluetooth
 import re
 
 
@@ -29,6 +30,18 @@ class ConnectionForm(QtWidgets.QDialog):
             formlayout.addRow(self.qlabel1, self.i1)
             formlayout.addRow(self.qlabel2, self.i2)
 
+        elif self.selected == 'Bluetooth':
+            self.devices = dict()
+            self.qlabel1 = QtWidgets.QLabel(self.formBox)
+            self.qlabel1.setText("Devices: ")
+            self.pick_bluetooth = QtWidgets.QComboBox()
+            available_devices = bluetooth.discover_devices(duration=5, lookup_names=True)
+            for addr, name in available_devices:
+                self.devices[name] = addr
+                self.pick_bluetooth.addItem(name)
+            print(self.devices)
+            formlayout.addRow(self.qlabel1, self.pick_bluetooth)
+
         elif self.selected == 'WiFi':
             self.qlabel1 = QtWidgets.QLabel(self.formBox)
             self.qlabel2 = QtWidgets.QLabel(self.formBox)
@@ -44,9 +57,6 @@ class ConnectionForm(QtWidgets.QDialog):
             formlayout.addRow(self.transport)
             formlayout.addRow(self.qlabel2, self.i2)
 
-        elif self.selected == 'Bluetooth':
-            pass
-
         self.formBox.setLayout(formlayout)
         self.mainLayout.addWidget(self.formBox)
         self.mainLayout.addWidget(self.buttonBox)
@@ -59,14 +69,20 @@ class ConnectionForm(QtWidgets.QDialog):
         if self.selected == 'Serial':
             comm_args['port'] = self.i1.text()
             comm_args['baudrate'] = self.i2.text()
+
+        elif self.selected == 'Bluetooth':
+            name = self.pick_bluetooth.currentText()
+            comm_args['mac_addr'] = self.devices[name]
+
         elif self.selected == 'WiFi':
             comm_args['ip'] = self.i1.text()
             comm_args['protocol'] = self.transport.currentText()
             comm_args['port'] = self.i2.text()
 
         if self.validate_input(comm_args):
-            self.core.set_comm(comm_args)
             super().accept()
+            self.core.set_comm(comm_args)
+
 
         else:
             ErrorMessageWrapper('Connection Error', 'Error in the arguments')
@@ -83,7 +99,10 @@ class ConnectionForm(QtWidgets.QDialog):
                         return False
             return False
 
-        else:  # TODO change to elif comm_args['type'] == 'Wifi': | Isn't working elif for some reason
+        # No need to check for bluetooth data
+        elif comm_args['type'] == 'Bluetooth':
+            return True
+        elif comm_args['type'] == 'WiFi':
             valid_ip_address = "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$"
             if re.match(valid_ip_address, comm_args['ip']):
                 try:
@@ -143,8 +162,6 @@ class PlotForm(QtWidgets.QDialog):
         self.qt_table.setColumnCount(3)
         self.qt_table.setRowCount(0)
         self.qt_table.setHorizontalHeaderLabels(['Pins', 'Eval', 'Color'])
-        # TODO: Make a proper configuration of the table
-
         self.qt_table.horizontalHeader().setSectionResizeMode(0, QtWidgets.QHeaderView.Stretch)
         self.qt_table.horizontalHeader().setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
         self.qt_table.horizontalHeader().setSectionResizeMode(2, QtWidgets.QHeaderView.Stretch)

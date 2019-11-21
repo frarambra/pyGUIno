@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout, QSizePolicy,\
     QFrame, QMenuBar, QMenu, QAction, QStatusBar, QErrorMessage,\
     QTabWidget, QHBoxLayout, QApplication, QMainWindow
 
-from utils import CustomWidgets, Forms
+from utils import CustomWidgets, Forms, Communication
 from PyQt5 import QtCore
 from PyQt5.QtCore import pyqtSignal, QRect, QMetaObject, QCoreApplication
 from functools import partial
@@ -15,7 +15,6 @@ import sys
 
 class PyGUIno:
     def __init__(self):
-        print("PyGUIno: Instantiating")
         self.app = QApplication(sys.argv)
         self.size = self.app.primaryScreen().size()
         self.pin_dict = None
@@ -110,8 +109,6 @@ class PyGUIno:
 
         # Hacemos que actuen a los triggers para loggers
 
-        print("BaseApp: Instanciado")
-
     def retranslate_ui(self, mainwindow):
         _translate = QCoreApplication.translate
         mainwindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
@@ -145,7 +142,6 @@ class PyGUIno:
 
     def ini_graph_dialog(self):
         if self.pin_dict:
-            print("BaseApp: Creating PlotForm")
             Forms.PlotForm(self.widgetCoord, self.pin_dict)
         else:
             error_msg = QErrorMessage()
@@ -157,13 +153,11 @@ class PyGUIno:
 
     @staticmethod
     def set_connform(args):
-        print('BaseApp: Creating ConnectionForm')
         Forms.ConnectionForm(args)
 
 
 class WidgetCoordinator:
     def __init__(self, central_widget, comm_args, size, user_vars):
-        print("WidgetCoordinator: Instantiating")
         # Class attributes
         width = size.width()
         height = size.height()
@@ -234,6 +228,8 @@ class WidgetCoordinator:
     # Communication related methods
     def set_comm(self, comm_args):
         try:
+            print('Starting communication')
+            print('comm_args: {}'.format(comm_args))
             if comm_args['type'] == 'Serial':
                 arduino = PyCmdMessenger.ArduinoBoard(comm_args['port'], comm_args['baudrate'],
                                                       timeout=3.0, settle_time=3.0)
@@ -241,7 +237,8 @@ class WidgetCoordinator:
             elif comm_args['type'] == 'WiFi':
                 pass
             elif comm_args['type'] == 'Bluetooth':
-                pass
+                arduino = Communication.ArduinoBoardBluetooth(mac_addr=comm_args['mac_addr'])
+                self.comm = PyCmdMessenger.CmdMessenger(arduino, self.commands)
             self.recv_thread = QThreadComm(self.comm)
             self.recv_thread.signal.connect(self.handle_new_data)
             self.recv_thread.start()
