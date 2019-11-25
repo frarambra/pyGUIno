@@ -63,23 +63,16 @@ class PyGUIno:
         self.window.setStatusBar(self.statusbar)
 
         # Create Workspace area
+        self.widgetCoord = WidgetCoordinator()
         left_layout = QVBoxLayout()
         right_layout = QVBoxLayout()
         left_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setContentsMargins(0, 0, 0, 0)
 
-        top_left_side = QTextEdit()
-        top_left_side.setFrameShape(QFrame.StyledPanel)
-        top_right_side = QTextEdit()
-        top_right_side.setFrameShape(QFrame.StyledPanel)
-        low_left_side = QTextEdit()
-        low_left_side.setFrameShape(QFrame.StyledPanel)
-        low_right_side = QTextEdit()
-        low_right_side.setFrameShape(QFrame.StyledPanel)
-        top_left_side.setStyleSheet('background-color:white')
-        low_left_side.setStyleSheet('background-color:white')
-        top_right_side.setStyleSheet('background-color:white')
-        low_right_side.setStyleSheet('background-color:white')
+        top_left_side = self.widgetCoord.plot_container
+        top_right_side = self.widgetCoord.user_vars_table
+        low_left_side = self.widgetCoord.debug_vars_widget
+        low_right_side = self.widgetCoord.log_container
 
         # Prepare horizontal splitter and left and right vertical splitters
         horizontal_splitter = QSplitter(Qt.Horizontal)
@@ -105,11 +98,6 @@ class PyGUIno:
         horizontal_splitter.addWidget(right_vertical_splitter)
         self.layout.addWidget(horizontal_splitter)
         self.layout.setContentsMargins(0, 0, 0, 0)
-
-
-        # Instantiate WidgetCoordinator
-        #self.widgetCoord = WidgetCoordinator(central_widget=self.centralwidget,
-        #                                     comm_args=None, size=self.size, user_vars=None)
 
     def start(self):
         self.window.show()
@@ -139,10 +127,8 @@ class PyGUIno:
 
 
 class WidgetCoordinator:
-    def __init__(self, central_widget, comm_args, size, user_vars):
+    def __init__(self):
         # Class attributes
-        width = size.width()
-        height = size.height()
         self.list_widgets = []
         self.user_vars = dict()
         self.commands = [
@@ -156,54 +142,22 @@ class WidgetCoordinator:
         ]
         self.recv_thread = None
         self.comm = None
-        # Start communication
-        if comm_args:
-            self.set_comm(comm_args=comm_args)
-        if user_vars:
-            self.user_vars = user_vars
 
+
+
+        # Create layout for the widgets
+        self.debug_vars_widget = CustomWidgets.DebugVarsTable(user_vars=self.user_vars)
+        self.user_vars_table = CustomWidgets.UserVarsTable(user_vars=self.user_vars)
+        self.plot_container = QTabWidget()
+        self.log_container = QTabWidget()
+        self.plot_container.setStyleSheet('background-color:white')
+        self.log_container.setStyleSheet('background-color:white')
         # Create loggers
-        logs = ['I2C', 'SPI', 'SERIAL']
+        logs = ['All', 'Serial', 'I2C', 'SPI']
         for log_id in logs:
             log = logging.getLogger(log_id)
             log.setLevel(logging.INFO)
-
-        # Create layout for the widgets
-        q_plot = QFrame()
-        q_logger = QFrame()
-        q_table = QFrame()
-        q_plot.setFrameStyle(QFrame.StyledPanel | QFrame.Sunken)
-        q_logger.setFrameStyle(QFrame.StyledPanel | QFrame.Sunken)
-        q_table.setFrameStyle(QFrame.StyledPanel | QFrame.Sunken)
-
-        plt_container = QHBoxLayout()
-        logger_container = QHBoxLayout()
-        table_container = QHBoxLayout()
-
-        self.PlotTabWidget = QTabWidget()
-        self.PlotTabWidget.setFixedWidth(width/2)
-        self.PlotTabWidget.setFixedHeight(height/2)
-        self.LoggerTabWidget = QTabWidget()
-        self.LoggerTabWidget.setFixedWidth(width/2)
-        self.LoggerTabWidget.setFixedHeight(height/2)
-        self.TableTabWidget = QTabWidget()
-
-        plt_container.addWidget(self.PlotTabWidget)
-        logger_container.addWidget(self.LoggerTabWidget)
-        table_container.addWidget(self.TableTabWidget)
-
-        q_plot.setLayout(plt_container)
-        q_logger.setLayout(logger_container)
-        q_table.setLayout(table_container)
-
-        # self.PlotTabWidget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-
-        self.mainLayout = QVBoxLayout(central_widget)
-        upper_layout = QHBoxLayout()
-        upper_layout.addWidget(q_plot)
-        upper_layout.addWidget(q_logger)
-        self.mainLayout.addLayout(upper_layout)
-        self.mainLayout.addWidget(q_table)
+            self.create_logger_widget(log_id)
 
     # Communication related methods
     def set_comm(self, comm_args):
@@ -283,18 +237,12 @@ class WidgetCoordinator:
                                                config_plt_data=conf_plots,
                                                user_dict_ref=self.user_vars)
         self.list_widgets.append(plot_widget)
-        self.PlotTabWidget.addTab(plot_widget, conf_ui['title'])
+        self.plot_container.addTab(plot_widget, conf_ui['title'])
 
     def create_logger_widget(self, log_id):
         log_widget = CustomWidgets.CustomLogger(log_id=log_id)
         self.list_widgets.append(log_widget)
-        self.LoggerTabWidget.addTab(log_widget, log_id)
-
-    def create_table_widget(self):
-        # TODO: There won't be tabs for this, it's only temporal
-        table_widget = CustomWidgets.UserVarsTable(self.user_vars)
-        self.list_widgets.append(table_widget)
-        self.TableTabWidget.addTab(table_widget, "")
+        self.log_container.addTab(log_widget, log_id)
 
 
 class QThreadComm(QThread):
@@ -302,7 +250,7 @@ class QThreadComm(QThread):
     signal = pyqtSignal(tuple)  # Mandatory to be defined at level class
 
     def __init__(self, comm):
-        QtCore.QThread.__init__(self, parent=None)
+        QThread.__init__(self, parent=None)
         self.comm = comm
         self.keep_going = True
 

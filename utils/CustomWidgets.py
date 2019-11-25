@@ -103,55 +103,30 @@ class CustomLogger(QWidget, logging.Handler):
         self.loggerText.appendPlainText(msg)
 
 
-class UserVarsTable(QWidget):
+class DebugVarsTable(QWidget):
     def __init__(self, user_vars):
         QWidget.__init__(self, parent=None)
         self.mainLayout = QHBoxLayout()
-        self.ArduinoTable = QTableWidget()  # VarName | Value | Adress | Type?
-        self.UserTable = QTableWidget()  # VarName | str(value) or math expression
+        self.mainLayout.setContentsMargins(0, 0, 0, 0)
+        self.setStyleSheet('background-color:white')
+        self.ArduinoTable = QTableWidget()  # VarName | Value | Adress | Type
         self._selected_row = None
         self.user_vars = user_vars
 
         self.ArduinoTable.setColumnCount(4)
         self.ArduinoTable.setRowCount(0)
-        self.UserTable.setColumnCount(2)
-        self.UserTable.setRowCount(0)
 
         # Configure the table settings
         self.ArduinoTable.setHorizontalHeaderLabels(['Arduino variables', 'Value', 'Address', 'Data Type'])
-        self.UserTable.setHorizontalHeaderLabels(['User variables', 'Value'])
-
-        self.UserTable.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.UserTable.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.ArduinoTable.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.ArduinoTable.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.ArduinoTable.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         self.ArduinoTable.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
-
         self.ArduinoTable.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.UserTable.setEditTriggers(QAbstractItemView.NoEditTriggers)
-
-        # Add event handlers
-        self.UserTable.itemClicked.connect(self.selected_row)
-
-        # Set of buttons for UserTable, use some sort of icons, +, crank, -
-        button_container = QVBoxLayout()
-        self.add_button = QPushButton('Add')
-        self.delete_button = QPushButton('Delete')
-
-        self.add_button.clicked.connect(self.open_add_dialog)
-        self.delete_button.clicked.connect(self.delete_from_user_vars)
-
-        button_container.addWidget(self.add_button)
-        button_container.addWidget(self.delete_button)
 
         # Set up layout and add widgets
         self.setLayout(self.mainLayout)
         self.layout().addWidget(self.ArduinoTable)
-        self.layout().addWidget(self.UserTable)
-        self.layout().addLayout(button_container)
-
-        self.show()
 
     def new_arduino_data(self, data):
         append_row = self.ArduinoTable.rowCount()
@@ -175,6 +150,46 @@ class UserVarsTable(QWidget):
         # Update user_dict
         self.user_vars[data['name']] = data['value']
 
+
+class UserVarsTable(QWidget):
+    def __init__(self, user_vars):
+        QWidget.__init__(self, parent=None)
+        self.mainLayout = QHBoxLayout()
+        self.mainLayout.setContentsMargins(0, 0, 0, 0)
+        self.setStyleSheet('background-color:white')
+        self.UserTable = QTableWidget()  # VarName | str(value) or math expression
+        self._selected_row = None
+        self.user_vars = user_vars
+
+        self.UserTable.setColumnCount(2)
+        self.UserTable.setRowCount(0)
+
+        # Configure the table settings
+        self.UserTable.setHorizontalHeaderLabels(['User variables', 'Value'])
+        self.UserTable.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.UserTable.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.UserTable.setEditTriggers(QAbstractItemView.NoEditTriggers)
+
+        # Add event handlers
+        self.UserTable.itemClicked.connect(self.selected_row)
+
+        # Set of buttons for UserTable, use some sort of icons, +, crank, -
+        button_container = QVBoxLayout()
+        button_container.setContentsMargins(0, 0, 0, 0)
+        self.add_button = QPushButton('Add')
+        self.delete_button = QPushButton('Delete')
+
+        self.add_button.clicked.connect(self.open_add_dialog)
+        self.delete_button.clicked.connect(self.delete_from_user_vars)
+
+        button_container.addWidget(self.add_button)
+        button_container.addWidget(self.delete_button)
+
+        # Set up layout and add widgets
+        self.setLayout(self.mainLayout)
+        self.layout().addWidget(self.UserTable)
+        self.layout().addLayout(button_container)
+
     def open_add_dialog(self):
         try:
             self.AddUserVarMenu(self.UserTable, self.user_vars)
@@ -183,7 +198,7 @@ class UserVarsTable(QWidget):
 
     def delete_from_user_vars(self):
         if self._selected_row and bool(self.user_vars):
-            actual_row = self._selected_row-1
+            actual_row = self._selected_row - 1
             key = self.UserTable.item(actual_row, 0).text()
             self.UserTable.removeRow(actual_row)
             del self.user_vars[key]
@@ -191,7 +206,7 @@ class UserVarsTable(QWidget):
 
     def selected_row(self, item):
         self.UserTable.selectRow(item.row())
-        self._selected_row = item.row()+1  # Shenanigan
+        self._selected_row = item.row() + 1  # Shenanigan
         print('Selected row: {}'.format(self._selected_row))
 
     class AddUserVarMenu(QDialog):
