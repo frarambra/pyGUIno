@@ -6,64 +6,117 @@ import re
 
 
 class ConnectionForm(QtWidgets.QDialog):
-    def __init__(self, args):
-        QtWidgets.QDialog.__init__(self)
-        self.setWindowFlags(QtCore.Qt.CustomizeWindowHint | QtCore.Qt.WindowCloseButtonHint)
-        self.selected = args['type']
-        self.core = args['core']
-        self.buttonBox = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
-        self.buttonBox.rejected.connect(self.reject)
-        self.buttonBox.accepted.connect(self.accept)
-        self.dialogLayout = QtWidgets.QVBoxLayout()
-        self.formBox = QtWidgets.QGroupBox(self.selected)
-        formlayout = QtWidgets.QFormLayout()
-        self.mainLayout = QtWidgets.QVBoxLayout()
-        self.setWindowTitle("Conexion")
+    # TODO: Remove try catch
+    def __init__(self, connect_action, disconnect_action, widget_coord):
+        try:
+            QtWidgets.QDialog.__init__(self)
+            self.setWindowFlags(QtCore.Qt.CustomizeWindowHint | QtCore.Qt.WindowCloseButtonHint)
+            self.widgetCoord = widget_coord
+            self.disconnet_action = disconnect_action
+            self.connect_action = connect_action
+            self.selected = 'Serial'  # Default value
+            self.devices = dict()  # Just used on bluetooth connections
 
-        if self.selected == 'Serial':
+            # Select type of connection
+            conn_selection_layout = QtWidgets.QHBoxLayout()
+            serial_button = QtWidgets.QRadioButton('Serial')
+            serial_button.setChecked(True)
+            bluetooth_button = QtWidgets.QRadioButton('Bluetooth')
+            internet_button = QtWidgets.QRadioButton('Internet')
+            serial_button.toggled.connect(self.on_selected)
+            bluetooth_button.toggled.connect(self.on_selected)
+            internet_button.toggled.connect(self.on_selected)
+            conn_selection_layout.addWidget(serial_button)
+            conn_selection_layout.addWidget(bluetooth_button)
+            conn_selection_layout.addWidget(internet_button)
+
+            # Middle section for the type of connection
+            self.formBox = QtWidgets.QGroupBox()
             self.qlabel1 = QtWidgets.QLabel(self.formBox)
             self.qlabel2 = QtWidgets.QLabel(self.formBox)
-            self.qlabel1.setText('Serial')
-            self.qlabel2.setText('Baudrate')
             self.i1 = QtWidgets.QLineEdit()
             self.i2 = QtWidgets.QLineEdit()
-            formlayout.addRow(self.qlabel1, self.i1)
-            formlayout.addRow(self.qlabel2, self.i2)
-
-        elif self.selected == 'Bluetooth':
-            self.devices = dict()
-            self.qlabel1 = QtWidgets.QLabel(self.formBox)
-            self.qlabel1.setText("Devices: ")
-            self.pick_bluetooth = QtWidgets.QComboBox()
-            available_devices = bluetooth.discover_devices(duration=5, lookup_names=True)
-            for addr, name in available_devices:
-                self.devices[name] = addr
-                self.pick_bluetooth.addItem(name)
-            print(self.devices)
-            formlayout.addRow(self.qlabel1, self.pick_bluetooth)
-
-        elif self.selected == 'WiFi':
-            self.qlabel1 = QtWidgets.QLabel(self.formBox)
-            self.qlabel2 = QtWidgets.QLabel(self.formBox)
-            self.qlabel1.setText('IP')
-            self.qlabel2.setText('Puerto')
             self.transport = QtWidgets.QComboBox()
-            self.transport.addItem("TCP")
-            self.transport.addItem("UDP")
-            self.i1 = QtWidgets.QLineEdit()
-            self.i2 = QtWidgets.QLineEdit()
+            self.pick_bluetooth = QtWidgets.QComboBox()
 
-            formlayout.addRow(self.qlabel1, self.i1)
-            formlayout.addRow(self.transport)
-            formlayout.addRow(self.qlabel2, self.i2)
+            # Accept/Reject
+            button_box = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
+            button_box.rejected.connect(self.reject)
+            button_box.accepted.connect(self.accept)
 
-        self.formBox.setLayout(formlayout)
-        self.mainLayout.addWidget(self.formBox)
-        self.mainLayout.addWidget(self.buttonBox)
-        self.setLayout(self.mainLayout)
-        self.exec_()
+            # Add everything to the dialog layout
+            self.formlayout = QtWidgets.QFormLayout()
+            main_layout = QtWidgets.QVBoxLayout()
+            self.setWindowTitle("Connect")
+            self.formBox.setLayout(self.formlayout)
+            main_layout.addLayout(conn_selection_layout)
+            main_layout.addWidget(self.formBox)
+            main_layout.addWidget(button_box)
+            self.setLayout(main_layout)
 
-    @QtCore.pyqtSlot()
+            self.formBox.setTitle('Serial')
+            self.qlabel1.setText('Port')
+            self.qlabel2.setText('Baudrate')
+            self.formlayout.addRow(self.qlabel1, self.i1)
+            self.formlayout.addRow(self.qlabel2, self.i2)
+
+            self.exec_()
+        except Exception as err:
+            print(err)
+
+    def on_selected(self):
+        try:
+            selected_button = self.sender()
+            self.selected = selected_button.text()
+            # Delete in formlayout
+            while self.formlayout.count():
+                item = self.formlayout.takeAt(0)
+                if item.widget():
+                    item.widget().deleteLater()
+
+            # Now that the formLayout is empty we populate it
+            self.formBox.setTitle(self.selected)
+            if self.selected == 'Serial':
+                self.qlabel1 = QtWidgets.QLabel(self.formBox)
+                self.qlabel2 = QtWidgets.QLabel(self.formBox)
+                self.qlabel1.setText('Port')
+                self.qlabel2.setText('Baudrate')
+                self.i1 = QtWidgets.QLineEdit()
+                self.i2 = QtWidgets.QLineEdit()
+
+                self.formlayout.addRow(self.qlabel1, self.i1)
+                self.formlayout.addRow(self.qlabel2, self.i2)
+
+            elif self.selected == 'Bluetooth':
+                self.devices.clear()
+                self.qlabel1 = QtWidgets.QLabel(self.formBox)
+                self.qlabel1.setText("Devices: ")
+                self.pick_bluetooth = QtWidgets.QComboBox()
+                # TODO: Check if we can use asyncio to update something while waiting
+                available_devices = bluetooth.discover_devices(duration=5, lookup_names=True)
+                for addr, name in available_devices:
+                    self.devices[name] = addr
+                    self.pick_bluetooth.addItem(name)
+
+                self.formlayout.addRow(self.qlabel1, self.pick_bluetooth)
+
+            else:  # It can only be Internet option
+                self.qlabel1 = QtWidgets.QLabel(self.formBox)
+                self.qlabel2 = QtWidgets.QLabel(self.formBox)
+                self.qlabel1.setText('IP')
+                self.qlabel2.setText('Puerto')
+                self.transport = QtWidgets.QComboBox()
+                self.transport.addItem("TCP")
+                self.transport.addItem("UDP")
+                self.i1 = QtWidgets.QLineEdit()
+                self.i2 = QtWidgets.QLineEdit()
+
+                self.formlayout.addRow(self.qlabel1, self.i1)
+                self.formlayout.addRow(self.transport)
+                self.formlayout.addRow(self.qlabel2, self.i2)
+        except Exception as err:
+            print(err)
+
     def accept(self):
         comm_args = {'type': self.selected}
         if self.selected == 'Serial':
@@ -79,10 +132,13 @@ class ConnectionForm(QtWidgets.QDialog):
             comm_args['protocol'] = self.transport.currentText()
             comm_args['port'] = self.i2.text()
 
-        if self.validate_input(comm_args):
-            self.core.set_comm(comm_args)
+        if self.validate_input(comm_args) and self.widgetCoord.set_comm(comm_args):
+            self.widgetCoord.start_comm()
+            # Enable dc
+            self.connect_action.setEnabled(False)
+            self.disconnet_action.setEnabled(True)
         else:
-            ErrorMessageWrapper('Connection Error', 'Error in the arguments')
+            ErrorMessageWrapper('Connection Error', 'There was an error setting up the connection')
         super().accept()
 
     @staticmethod
@@ -117,7 +173,7 @@ class ConnectionForm(QtWidgets.QDialog):
 
 # TODO: Support for debug vars too
 class PlotForm(QtWidgets.QDialog):
-    def __init__(self, core, pin_dict):
+    def __init__(self, widget_coord, pin_dict, debug_vars, user_vars):
         QtWidgets.QDialog.__init__(self)
         self.setWindowFlags(QtCore.Qt.CustomizeWindowHint | QtCore.Qt.WindowCloseButtonHint)
         self._color_dict = {'r': 'red',
@@ -130,14 +186,16 @@ class PlotForm(QtWidgets.QDialog):
                             'w': 'white'}
 
         self.setWindowTitle("Add new plot")
-        self.setFixedWidth(400)
-        self.setFixedHeight(300)
-        self.coreRef = core
+        self.setMinimumWidth(400)
+        self.setMinimumHeight(300)
+        self.widgetCoord = widget_coord
 
         # form Box
         formlayout = QtWidgets.QFormLayout()
         formbox = QtWidgets.QGroupBox("General settings")
         self.lineedit1 = QtWidgets.QLineEdit()
+        self.lineedit1.setStatusTip('Expression to evaluate when upon recieving a pin '
+                                    'value, leave blank to plot the just the pin value')
         qlabel1 = QtWidgets.QLabel('Title')
         formlayout.addRow(qlabel1, self.lineedit1)
 

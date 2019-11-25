@@ -17,10 +17,10 @@ class PyGUIno:
     def __init__(self):
         # Set up all the window related stuff
         self.app = QApplication(sys.argv)
-        self.size = self.app.primaryScreen().size()
         self.window = QMainWindow()
-        self.window.resize(int(self.size.width()*0.7),
-                           int(self.size.height()*0.8))
+        size = self.app.primaryScreen().size()
+        self.window.resize(int(size.width()*0.7),
+                           int(size.height()*0.8))
         self.window.setObjectName("PyGUIno")
         self.window.setWindowTitle('PyGUIno')
         self.window.setWindowIcon(QIcon('resources\\assets\\roto2.png'))
@@ -31,30 +31,43 @@ class PyGUIno:
         self.centralwidget.setLayout(self.layout)
 
         # Create actions and then toolbar
-        # TODO: add signal handling and proper aligment
+        # TODO: add aligment
         self.toolbar = QToolBar()
-        self.save_action = QAction(QIcon('resources\\assets\\roto2.png'), 'Save', self.window)
-        self.save_action.setStatusTip('Save current currents plots')
-        self.load_action = QAction(QIcon('resources\\assets\\roto2.png'), 'Load', self.window)
-        self.load_action.setStatusTip('Load plots from other projects')
+        save_action = QAction(QIcon('resources\\assets\\roto2.png'), 'Save', self.window)
+        save_action.setStatusTip('Save current currents plots')
+        load_action = QAction(QIcon('resources\\assets\\roto2.png'), 'Load', self.window)
+        load_action.setStatusTip('Load plots from other projects')
         self.connect_action = QAction(QIcon('resources\\assets\\roto2.png'), 'Connect', self.window)
         self.connect_action.setStatusTip('Configute the connection to Arduino')
-        self.start_stop_action = QAction(QIcon('resources\\assets\\roto2.png'), 'Start', self.window)
-        # rock_red
-        self.board_selector = QComboBox()
+        self.disconnect_action = QAction(QIcon('resources\\assets\\roto2.png'), 'Start', self.window)
+        self.disconnect_action.setEnabled(False)
+        self.disconnect_action.setStatusTip('Stops the Connection with Arduino')
 
+        board_selector = QComboBox()
+        self.pin_dict = None
+        self._pin_choices = []
         schemas = os.listdir("resources\\schemas")
         for schema in schemas:
             fd = open("resources\\schemas\\" + schema, 'r')
             data = json.load(fd)
-            self.board_selector.addItem(data['meta']['ui'])
+            board_selector.addItem(data['meta']['ui'])
+            # Set default pin_dict to avoid None errors
+            self._pin_choices.append(data['pin'])
+            self.pin_dict = data['pin']
             fd.close()
 
-        self.toolbar.addAction(self.save_action)
-        self.toolbar.addAction(self.load_action)
+        # Signal handlers
+        save_action.triggered.connect(self.save)
+        load_action.triggered.connect(self.load)
+        self.connect_action.triggered.connect(self.connect)
+        self.disconnect_action.triggered.connect(self.stop)
+        board_selector.currentIndexChanged.connect(self.switch_board)
+
+        self.toolbar.addAction(save_action)
+        self.toolbar.addAction(load_action)
         self.toolbar.addAction(self.connect_action)
-        self.toolbar.addAction(self.start_stop_action)
-        self.toolbar.addWidget(self.board_selector)
+        self.toolbar.addAction(self.disconnect_action)
+        self.toolbar.addWidget(board_selector)
 
         self.window.addToolBar(self.toolbar)
 
@@ -104,26 +117,26 @@ class PyGUIno:
         sys.exit(self.app.exec_())
 
     # Functions to trigger several menu actions
-    def new_action(self):
+    def save(self):
         pass
 
-    def load_action(self):
+    def load(self):
         pass
+
+    def connect(self):
+        Forms.ConnectionForm(self.connect_action, self.disconnect_action,
+                             self.widgetCoord)
+
+    def stop(self):
+        self.widgetCoord.stop_comm()
+        self.disconnect_action.setEnabled(False)
+        self.connect_action.setEnabled(True)
 
     def ini_graph_dialog(self):
-        if self.pin_dict:
-            Forms.PlotForm(self.widgetCoord, self.pin_dict)
-        else:
-            error_msg = QErrorMessage()
-            error_msg.showMessage("Please select a board first")
-            error_msg.exec_()
+        Forms.PlotForm(self.widgetCoord, self.pin_dict, self.widgetCoord.user_vars, )
 
-    def set_pin_dict(self, arg_data):
-        self.pin_dict = arg_data
-
-    @staticmethod
-    def set_connform(args):
-        Forms.ConnectionForm(args)
+    def switch_board(self, index):
+        self.pin_dict = self._pin_choices[index]
 
 
 class WidgetCoordinator:
@@ -131,6 +144,7 @@ class WidgetCoordinator:
         # Class attributes
         self.list_widgets = []
         self.user_vars = dict()
+        self.debug_vars = dict()
         self.commands = [
             ["ack_start", "s"],  # To recieve: With this we will be aware when the communication has started
             ["request_pin", "i"],  # To send: First arg will be the number of pins to start tracking then the pin number
@@ -143,12 +157,12 @@ class WidgetCoordinator:
         self.recv_thread = None
         self.comm = None
 
-
-
         # Create layout for the widgets
-        self.debug_vars_widget = CustomWidgets.DebugVarsTable(user_vars=self.user_vars)
+        self.debug_vars_widget = CustomWidgets.DebugVarsTable(debug_vars=self.debug_vars)
         self.user_vars_table = CustomWidgets.UserVarsTable(user_vars=self.user_vars)
         self.plot_container = QTabWidget()
+        self.plot_container.setMinimumWidth(400)
+        self.plot_container.setMinimumHeight(300)
         self.log_container = QTabWidget()
         self.plot_container.setStyleSheet('background-color:white')
         self.log_container.setStyleSheet('background-color:white')
@@ -173,18 +187,25 @@ class WidgetCoordinator:
             elif comm_args['type'] == 'Bluetooth':
                 arduino = Communication.ArduinoBoardBluetooth(mac_addr=comm_args['mac_addr'])
                 self.comm = PyCmdMessenger.CmdMessenger(arduino, self.commands)
-            self.recv_thread = QThreadComm(self.comm)
-            self.recv_thread.signal.connect(self.handle_new_data)
-            self.recv_thread.start()
         except Exception as err:
             print(err.__class__)
             print(err)
             if self.recv_thread and self.recv_thread.isRunning():
                 self.recv_thread.stop()
+            return False
+        else:
+            return True
 
     def stop_comm(self):
         if self.recv_thread:
             self.recv_thread.stop()
+        self.comm.board.close()
+        self.comm = None  # To force the garbage collector
+
+    def start_comm(self):
+        self.recv_thread = QThreadComm(self.comm)
+        self.recv_thread.signal.connect(self.handle_new_data)
+        self.recv_thread.start()
 
     def handle_new_data(self, msg):
         input_log = logging.getLogger('SERIAL')
@@ -227,9 +248,8 @@ class WidgetCoordinator:
                     if isinstance(widget, CustomWidgets.UserVarsTable):
                         widget.new_arduino_data(row_as_dict)
             except Exception as err:
-                print(err)
-                # TODO: Write the error message properly
-                Forms.ErrorMessageWrapper('Debug Variable Error', 'tmp')
+                Forms.ErrorMessageWrapper('Debug Variable Error',
+                                          'There was an error related to debug variables\n{}'.format(err))
 
     # Widget related methods
     def create_plot_widget(self, conf_ui, conf_plots):

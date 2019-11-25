@@ -104,14 +104,14 @@ class CustomLogger(QWidget, logging.Handler):
 
 
 class DebugVarsTable(QWidget):
-    def __init__(self, user_vars):
+    def __init__(self, debug_vars):
         QWidget.__init__(self, parent=None)
         self.mainLayout = QHBoxLayout()
         self.mainLayout.setContentsMargins(0, 0, 0, 0)
         self.setStyleSheet('background-color:white')
         self.ArduinoTable = QTableWidget()  # VarName | Value | Adress | Type
         self._selected_row = None
-        self.user_vars = user_vars
+        self.debug_vars = debug_vars
 
         self.ArduinoTable.setColumnCount(4)
         self.ArduinoTable.setRowCount(0)
@@ -148,7 +148,7 @@ class DebugVarsTable(QWidget):
         self.ArduinoTable.setItem(append_row, 3, data_type_item)
 
         # Update user_dict
-        self.user_vars[data['name']] = data['value']
+        self.debug_vars[data['name']] = data['value']
 
 
 class UserVarsTable(QWidget):
