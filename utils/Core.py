@@ -1,11 +1,11 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QSizePolicy,\
-    QFrame, QMenuBar, QMenu, QAction, QStatusBar, QErrorMessage,\
-    QTabWidget, QHBoxLayout, QApplication, QMainWindow
-
-from utils import CustomWidgets, Forms, Communication
-from PyQt5 import QtCore
-from PyQt5.QtCore import pyqtSignal, QRect, QMetaObject, QCoreApplication
+    QFrame, QToolBar, QTextEdit, QAction, QStatusBar, QErrorMessage,\
+    QTabWidget, QHBoxLayout, QApplication, QMainWindow, QComboBox, QSplitter
+from PyQt5.QtCore import Qt, pyqtSignal, QRect, QMetaObject, QCoreApplication, QThread
+from PyQt5.QtGui import QIcon
 from functools import partial
+from utils import CustomWidgets, Forms, Communication
+
 import logging
 import PyCmdMessenger
 import os
@@ -15,122 +15,104 @@ import sys
 
 class PyGUIno:
     def __init__(self):
+        # Set up all the window related stuff
         self.app = QApplication(sys.argv)
         self.size = self.app.primaryScreen().size()
-        self.pin_dict = None
-        mainwindow = QMainWindow()
-        self.tmp = mainwindow  # Shenanigan cause I don't want to refractor
-
-        # Set up mainwindow, parameters
-        mainwindow.resize(self.size.width(), self.size.height())
-        mainwindow.setObjectName("PyGUIno")
-        self.centralwidget = QWidget(mainwindow)
-        mainwindow.setCentralWidget(self.centralwidget)
+        self.window = QMainWindow()
+        self.window.resize(int(self.size.width()*0.7),
+                           int(self.size.height()*0.8))
+        self.window.setObjectName("PyGUIno")
+        self.window.setWindowTitle('PyGUIno')
+        self.window.setWindowIcon(QIcon('resources\\assets\\roto2.png'))
+        self.centralwidget = QWidget(self.window)
+        self.window.setCentralWidget(self.centralwidget)
         self.centralwidget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.statusbar = QStatusBar(mainwindow)
-        mainwindow.setStatusBar(self.statusbar)
+        self.layout = QHBoxLayout()
+        self.centralwidget.setLayout(self.layout)
 
-        # Instantiate WidgetCoordinator
-        self.widgetCoord = WidgetCoordinator(central_widget=self.centralwidget,
-                                             comm_args=None, size=self.size, user_vars=None)
-
-        # Set up menuBar
-        self.menubar = QMenuBar(mainwindow)
-        self.menubar.setGeometry(QRect(0, 0, 800, 21))
-        mainwindow.setMenuBar(self.menubar)
-
-        self.menuFile = QMenu(self.menubar)
-        self.menuConnection = QMenu(self.menuFile)
-        self.menuBoards = QMenu(self.menuFile)
-        self.menuTools = QMenu(self.menubar)
-        self.menuLoggers = QMenu(self.menuTools)
-
-        # Create all QActions
-        self.actionNew = QAction(mainwindow)
-        self.actionLoad = QAction(mainwindow)
-        self.actionSerial = QAction(mainwindow)
-        self.actionStop = QAction(mainwindow)
-        self.actionBluetooth = QAction(mainwindow)
-        self.actionIP = QAction(mainwindow)
-        self.actionComm = QAction(mainwindow)
-        self.actionI2C = QAction(mainwindow)
-        self.actionSPI = QAction(mainwindow)
-        self.actionTable = QAction(mainwindow)
-        self.actionAddPlot = QAction(mainwindow)
-
-        # Set up QAction triggers
-        args1 = {'type': 'Serial', 'core': self.widgetCoord}
-        self.actionSerial.triggered.connect(partial(self.set_connform, args=args1))
-        args2 = {'type': 'WiFi', 'core': self.widgetCoord}
-        self.actionIP.triggered.connect(partial(self.set_connform, args=args2))
-        args3 = {'type': 'Bluetooth', 'core': self.widgetCoord}
-        self.actionBluetooth.triggered.connect(partial(self.set_connform, args=args3))
+        # Create actions and then toolbar
+        # TODO: add signal handling and proper aligment
+        self.toolbar = QToolBar()
+        self.save_action = QAction(QIcon('resources\\assets\\roto2.png'), 'Save', self.window)
+        self.save_action.setStatusTip('Save current currents plots')
+        self.load_action = QAction(QIcon('resources\\assets\\roto2.png'), 'Load', self.window)
+        self.load_action.setStatusTip('Load plots from other projects')
+        self.connect_action = QAction(QIcon('resources\\assets\\roto2.png'), 'Connect', self.window)
+        self.connect_action.setStatusTip('Configute the connection to Arduino')
+        self.start_stop_action = QAction(QIcon('resources\\assets\\roto2.png'), 'Start', self.window)
+        # rock_red
+        self.board_selector = QComboBox()
 
         schemas = os.listdir("resources\\schemas")
-        self.actionAddPlot.triggered.connect(self.ini_graph_dialog)
-
         for schema in schemas:
-            fd = open("resources\\schemas\\"+schema, 'r')
+            fd = open("resources\\schemas\\" + schema, 'r')
             data = json.load(fd)
-            qaction = QAction(mainwindow)
-            qaction.setText(data['meta']['ui'])
-            qaction.triggered.connect(partial(self.set_pin_dict, arg_data=data['pin']))
-            self.menuBoards.addAction(qaction)
+            self.board_selector.addItem(data['meta']['ui'])
             fd.close()
 
-        self.actionI2C.triggered.connect(partial(self.widgetCoord.create_logger_widget, log_id='I2C'))
-        self.actionSPI.triggered.connect(partial(self.widgetCoord.create_logger_widget, log_id='SPI'))
-        self.actionComm.triggered.connect(partial(self.widgetCoord.create_logger_widget, log_id='SERIAL'))
+        self.toolbar.addAction(self.save_action)
+        self.toolbar.addAction(self.load_action)
+        self.toolbar.addAction(self.connect_action)
+        self.toolbar.addAction(self.start_stop_action)
+        self.toolbar.addWidget(self.board_selector)
 
-        self.actionTable.triggered.connect(self.widgetCoord.create_table_widget)
+        self.window.addToolBar(self.toolbar)
 
-        # Add QAction to QMenu
-        self.menuConnection.addAction(self.actionSerial)
-        self.menuConnection.addAction(self.actionBluetooth)
-        self.menuConnection.addAction(self.actionIP)
+        # Create status bar
+        self.statusbar = QStatusBar(self.window)
+        self.window.setStatusBar(self.statusbar)
 
-        self.menuFile.addAction(self.actionNew)
-        self.menuFile.addAction(self.actionLoad)
-        self.menuFile.addAction(self.actionStop)
-        self.menuFile.addSeparator()
-        self.menuFile.addAction(self.menuConnection.menuAction())
-        self.menuFile.addAction(self.menuBoards.menuAction())
-        self.menuLoggers.addAction(self.actionComm)
-        self.menuLoggers.addAction(self.actionI2C)
-        self.menuLoggers.addAction(self.actionSPI)
-        self.menuTools.addAction(self.menuLoggers.menuAction())
-        self.menuTools.addAction(self.actionAddPlot)
-        self.menuTools.addAction(self.actionTable)
-        self.menubar.addAction(self.menuFile.menuAction())
-        self.menubar.addAction(self.menuTools.menuAction())
+        # Create Workspace area
+        left_layout = QVBoxLayout()
+        right_layout = QVBoxLayout()
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setContentsMargins(0, 0, 0, 0)
 
-        self.retranslate_ui(mainwindow)
-        QMetaObject.connectSlotsByName(mainwindow)
+        top_left_side = QTextEdit()
+        top_left_side.setFrameShape(QFrame.StyledPanel)
+        top_right_side = QTextEdit()
+        top_right_side.setFrameShape(QFrame.StyledPanel)
+        low_left_side = QTextEdit()
+        low_left_side.setFrameShape(QFrame.StyledPanel)
+        low_right_side = QTextEdit()
+        low_right_side.setFrameShape(QFrame.StyledPanel)
+        top_left_side.setStyleSheet('background-color:white')
+        low_left_side.setStyleSheet('background-color:white')
+        top_right_side.setStyleSheet('background-color:white')
+        low_right_side.setStyleSheet('background-color:white')
 
-        # Hacemos que actuen a los triggers para loggers
+        # Prepare horizontal splitter and left and right vertical splitters
+        horizontal_splitter = QSplitter(Qt.Horizontal)
+        horizontal_splitter.setStyleSheet('background-color:rgb(239, 239, 239)')
+        left_vertical_splitter = QSplitter(Qt.Vertical)
+        left_vertical_splitter.setStyleSheet('background-color:rgb(239, 239, 239)')
+        right_vertical_splitter = QSplitter(Qt.Vertical)
+        right_vertical_splitter.setStyleSheet('background-color:rgb(239, 239, 239)')
 
-    def retranslate_ui(self, mainwindow):
-        _translate = QCoreApplication.translate
-        mainwindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
-        self.menuFile.setTitle(_translate("MainWindow", "Archivo"))
-        self.menuConnection.setTitle(_translate("MainWindow", "Conexion"))
-        self.menuBoards.setTitle(_translate("MainWindow", "Boards"))
-        self.actionIP.setText(_translate("MainWindow", "IP"))
-        self.menuTools.setTitle(_translate("MainWindow", "Herramientas"))
-        self.menuLoggers.setTitle(_translate("MainWindow", "Loggers"))
-        self.actionAddPlot.setText(_translate("MainWindow", "Graficas"))
-        self.actionNew.setText(_translate("MainWindow", "Nuevo"))
-        self.actionLoad.setText(_translate("MainWindow", "Cargar"))
-        self.actionSerial.setText(_translate("MainWindow", "Serial"))
-        self.actionBluetooth.setText(_translate("MainWindow", "Bluetooth"))
-        self.actionComm.setText(_translate("MainWindow", "Comm"))
-        self.actionI2C.setText(_translate("MainWindow", "I2C"))
-        self.actionSPI.setText(_translate("MainWindow", "SPI"))
-        self.actionTable.setText(_translate("MainWindow", "Tabla"))
-        self.actionStop.setText(_translate("MainWindow", "Stop"))
+        # First add left then add right
+        left_vertical_splitter.addWidget(top_left_side)
+        left_vertical_splitter.addWidget(low_left_side)
+        left_layout.addWidget(left_vertical_splitter)
+
+        # The same but on the right side
+        right_vertical_splitter.addWidget(top_right_side)
+        right_vertical_splitter.addWidget(low_right_side)
+        right_layout.addWidget(right_vertical_splitter)
+
+        # Finally add the vertical splitters to the horizontal splitter
+        # And add it to the horizontal layout
+        horizontal_splitter.addWidget(left_vertical_splitter)
+        horizontal_splitter.addWidget(right_vertical_splitter)
+        self.layout.addWidget(horizontal_splitter)
+        self.layout.setContentsMargins(0, 0, 0, 0)
+
+
+        # Instantiate WidgetCoordinator
+        #self.widgetCoord = WidgetCoordinator(central_widget=self.centralwidget,
+        #                                     comm_args=None, size=self.size, user_vars=None)
 
     def start(self):
-        self.tmp.show()
+        self.window.show()
         sys.exit(self.app.exec_())
 
     # Functions to trigger several menu actions
@@ -179,8 +161,6 @@ class WidgetCoordinator:
             self.set_comm(comm_args=comm_args)
         if user_vars:
             self.user_vars = user_vars
-        else:
-            self.user_vars = dict()
 
         # Create loggers
         logs = ['I2C', 'SPI', 'SERIAL']
@@ -317,7 +297,7 @@ class WidgetCoordinator:
         self.TableTabWidget.addTab(table_widget, "")
 
 
-class QThreadComm(QtCore.QThread):
+class QThreadComm(QThread):
 
     signal = pyqtSignal(tuple)  # Mandatory to be defined at level class
 

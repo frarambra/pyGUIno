@@ -80,12 +80,10 @@ class ConnectionForm(QtWidgets.QDialog):
             comm_args['port'] = self.i2.text()
 
         if self.validate_input(comm_args):
-            super().accept()
             self.core.set_comm(comm_args)
-
-
         else:
             ErrorMessageWrapper('Connection Error', 'Error in the arguments')
+        super().accept()
 
     @staticmethod
     def validate_input(comm_args):

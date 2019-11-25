@@ -22,7 +22,7 @@ class ArduinoBoardBluetooth:
         self._is_connected = False
         self.open()
 
-        # Limits for the board, rest of the __init is code from
+        # Limits for the board, rest of the __init__ is code from
         # Michael J. Harms code for PyCmdMessenger
         self.int_min = -2 ** (8 * self.int_bytes - 1)
         self.int_max = 2 ** (8 * self.int_bytes - 1) - 1
