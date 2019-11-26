@@ -171,9 +171,8 @@ class ConnectionForm(QtWidgets.QDialog):
         return False
 
 
-# TODO: Support for debug vars too
 class PlotForm(QtWidgets.QDialog):
-    def __init__(self, widget_coord, pin_dict, debug_vars, user_vars):
+    def __init__(self, widget_coord, pin_dict, debug_vars):
         QtWidgets.QDialog.__init__(self)
         self.setWindowFlags(QtCore.Qt.CustomizeWindowHint | QtCore.Qt.WindowCloseButtonHint)
         self._color_dict = {'r': 'red',
@@ -189,7 +188,14 @@ class PlotForm(QtWidgets.QDialog):
         self.setMinimumWidth(400)
         self.setMinimumHeight(300)
         self.widgetCoord = widget_coord
+        self.pin_dict = pin_dict
+        self.debug_vars = debug_vars
 
+        # Some shenanigans to identify later what can be plotted
+        pin_dict_cpy = pin_dict.copy()
+        for key in debug_vars.keys():
+            pin_dict_cpy[key] = [key]
+        self.plt_dict = pin_dict_cpy
         # form Box
         formlayout = QtWidgets.QFormLayout()
         formbox = QtWidgets.QGroupBox("General settings")
@@ -204,8 +210,7 @@ class PlotForm(QtWidgets.QDialog):
         self.delete_button.setEnabled(False)
 
         # Attached functions to buttons
-
-        self.pin_dict = pin_dict
+        # TODO: Implement deleting
         add_button.clicked.connect(self.on_click_add)
 
         button_container = QtWidgets.QHBoxLayout()
@@ -242,7 +247,7 @@ class PlotForm(QtWidgets.QDialog):
 
     def on_click_add(self):
         # open a PinEvalDialog
-        PinEvalDialog(self, pin_dict=self.pin_dict, color_dict=self._color_dict)
+        PinEvalDialog(self, self.plt_dict, color_dict=self._color_dict)
 
     def add_new_row(self, pin_selected, eval_string, color):
         self.delete_button.setEnabled(True)
@@ -255,27 +260,28 @@ class PlotForm(QtWidgets.QDialog):
         self.qt_table.setItem(append_row, 1, item_math)
         self.qt_table.setItem(append_row, 2, item_color)
 
+    # TODO: Support for debug vars too
     def accept(self):
         try:
             n_rows = self.qt_table.rowCount()
-            conf_plt_pins = []
+            conf_plt_items = []
             for current_row in range(0, n_rows):
                 item_pin = self.qt_table.item(current_row, 0)
                 item_math = self.qt_table.item(current_row, 1)
                 item_color = self.qt_table.item(current_row, 2)
 
                 if item_pin and item_math and item_color:
-                    pin_key = item_pin.text()
-                    pin_number = self.pin_dict[pin_key]
+                    key = item_pin.text()
+                    number = self.plt_dict[key]
                     math_expression = item_math.text()
                     color_val = item_color.text()
                     color_key = list(self._color_dict.keys())[list(self._color_dict.values()).index(color_val)]
-                    conf_plt_pins.append((pin_key, pin_number, math_expression, color_key))
+                    conf_plt_items.append((key, number, math_expression, color_key))
 
             # Call the core to instantiate the PlotWidget
             general_config = dict()
             general_config['title'] = self.lineedit1.text()
-            self.coreRef.create_plot_widget(general_config, conf_plt_pins)
+            self.widgetCoord.create_plot_widget(general_config, conf_plt_items)
         except Exception as err:
             print(err)
         finally:
@@ -283,20 +289,21 @@ class PlotForm(QtWidgets.QDialog):
 
 
 class PinEvalDialog(QtWidgets.QDialog):
-    def __init__(self, form_to_notify, pin_dict, color_dict):
+    def __init__(self, form_to_notify, plt_dict, color_dict):
         QtWidgets.QDialog.__init__(self)
         self.setWindowFlags(QtCore.Qt.CustomizeWindowHint | QtCore.Qt.WindowCloseButtonHint)
         self.setWindowTitle(" ")
         self.setFixedWidth(300)
         self.setFixedHeight(150)
+        self.plt_form = form_to_notify
 
         qlabel1 = QtWidgets.QLabel("Pin:")
         qlabel2 = QtWidgets.QLabel("Expression to value:")
         qlabel3 = QtWidgets.QLabel("Plot Color:")
 
         self.pin_selector = QtWidgets.QComboBox()
-        for pin_id in sorted(pin_dict.keys()):
-            self.pin_selector.addItem(str(pin_id))
+        for plt_id in sorted(plt_dict.keys()):
+            self.pin_selector.addItem(str(plt_id))
         self.to_evaluate = QtWidgets.QLineEdit()
         self.pick_color = QtWidgets.QComboBox()
         for color in sorted(color_dict.values()):
@@ -304,7 +311,7 @@ class PinEvalDialog(QtWidgets.QDialog):
 
         button_box = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
         button_box.rejected.connect(self.reject)
-        button_box.accepted.connect(partial(self.custom_accept, form_to_notify=form_to_notify))
+        button_box.accepted.connect(self.custom_accept)
 
         main_layout = QtWidgets.QVBoxLayout()
         form_layout = QtWidgets.QFormLayout()
@@ -317,14 +324,13 @@ class PinEvalDialog(QtWidgets.QDialog):
 
         self.exec_()
 
-    def custom_accept(self, form_to_notify):
+    def custom_accept(self):
         # Get the user input and give it to form_to_notify
         pin_selected = self.pin_selector.currentText()
         eval_string = self.to_evaluate.text()
         color_selected = self.pick_color.currentText()
-
         # Handle adquired data to the PlotForm object
-        form_to_notify.add_new_row(pin_selected, eval_string, color_selected)
+        self.plt_form.add_new_row(pin_selected, eval_string, color_selected)
         super().accept()
 
 

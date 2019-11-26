@@ -1,4 +1,5 @@
 import bluetooth
+import time
 
 
 class ArduinoBoardBluetooth:
@@ -104,6 +105,7 @@ class ArduinoBoardBluetooth:
             self.bluetooth_socket = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
             self.bluetooth_socket.settimeout(self.timeout)
             self.bluetooth_socket.connect((self.mac_addr, port))
+            time.sleep(2.0)
         except bluetooth.btcommon.BluetoothError as err:
             # Error handler
             print(err)

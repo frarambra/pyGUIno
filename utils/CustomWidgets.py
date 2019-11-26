@@ -26,13 +26,14 @@ class WidgetPlot(QWidget):
         for tmp in config_plt_data:
             plt_item = self.plot_widget.getPlotItem()
             plt_aux_tmp = self.PltAux(pin_key=tmp[0], pin_number=tmp[1],
-                                      math_expression=tmp[2], color= tmp[3],
+                                      math_expression=tmp[2], color=tmp[3],
                                       plt_item=plt_item)
             self.resources[tmp[0]] = tmp[1]
             self.contained_plots.append(plt_aux_tmp)
 
         self.user_dict_ref = user_dict_ref
 
+    # TODO: Adapt for debug variables
     def new_data(self, data, timestamp):
         pin = data[0]
         value = data[1]

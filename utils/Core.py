@@ -38,10 +38,12 @@ class PyGUIno:
         load_action = QAction(QIcon('resources\\assets\\roto2.png'), 'Load', self.window)
         load_action.setStatusTip('Load plots from other projects')
         self.connect_action = QAction(QIcon('resources\\assets\\roto2.png'), 'Connect', self.window)
-        self.connect_action.setStatusTip('Configute the connection to Arduino')
+        self.connect_action.setStatusTip('Configure the connection to Arduino')
         self.disconnect_action = QAction(QIcon('resources\\assets\\roto2.png'), 'Start', self.window)
         self.disconnect_action.setEnabled(False)
         self.disconnect_action.setStatusTip('Stops the Connection with Arduino')
+        add_plot = QAction(QIcon('resources\\assets\\roto2.png'), 'Add plot', self.window)
+        add_plot.setStatusTip('Adds a plot')
 
         board_selector = QComboBox()
         self.pin_dict = None
@@ -59,12 +61,14 @@ class PyGUIno:
         # Signal handlers
         save_action.triggered.connect(self.save)
         load_action.triggered.connect(self.load)
+        add_plot.triggered.connect(self.ini_graph_dialog)
         self.connect_action.triggered.connect(self.connect)
         self.disconnect_action.triggered.connect(self.stop)
         board_selector.currentIndexChanged.connect(self.switch_board)
 
         self.toolbar.addAction(save_action)
         self.toolbar.addAction(load_action)
+        self.toolbar.addAction(add_plot)
         self.toolbar.addAction(self.connect_action)
         self.toolbar.addAction(self.disconnect_action)
         self.toolbar.addWidget(board_selector)
@@ -133,7 +137,8 @@ class PyGUIno:
         self.connect_action.setEnabled(True)
 
     def ini_graph_dialog(self):
-        Forms.PlotForm(self.widgetCoord, self.pin_dict, self.widgetCoord.user_vars, )
+        Forms.PlotForm(self.widgetCoord, self.pin_dict,
+                       self.widgetCoord.debug_vars)
 
     def switch_board(self, index):
         self.pin_dict = self._pin_choices[index]
@@ -142,7 +147,7 @@ class PyGUIno:
 class WidgetCoordinator:
     def __init__(self):
         # Class attributes
-        self.list_widgets = []
+        self.plt_list = []
         self.user_vars = dict()
         self.debug_vars = dict()
         self.commands = [
@@ -208,7 +213,7 @@ class WidgetCoordinator:
         self.recv_thread.start()
 
     def handle_new_data(self, msg):
-        input_log = logging.getLogger('SERIAL')
+        input_log = logging.getLogger('All')
         input_log.info(msg)
 
         command = msg[0]
@@ -218,7 +223,7 @@ class WidgetCoordinator:
         if command == self.commands[0][0]:  # ack_start
             print("Communication started {}".format(payload))
         elif command == self.commands[2][0]:  # arduino_transmit_pin_value
-            for widget in self.list_widgets:
+            for widget in self.plt_list:
                 if isinstance(widget, CustomWidgets.WidgetPlot):
                     widget.new_data(data=payload, timestamp=ts)
         elif command == self.commands[5][0]:  # arduino_transmit_debug_var
@@ -244,7 +249,8 @@ class WidgetCoordinator:
                 row_as_dict['addr'] = payload[1]
                 row_as_dict['name'] = payload[2]
                 row_as_dict['value'] = to_python_data(bytes(payload[3:]))
-                for widget in self.list_widgets:
+                self.debug_vars_widget.new_arduino_data(row_as_dict)
+                for widget in self.plt_list:
                     if isinstance(widget, CustomWidgets.UserVarsTable):
                         widget.new_arduino_data(row_as_dict)
             except Exception as err:
@@ -256,12 +262,11 @@ class WidgetCoordinator:
         plot_widget = CustomWidgets.WidgetPlot(configuration_data=conf_ui,
                                                config_plt_data=conf_plots,
                                                user_dict_ref=self.user_vars)
-        self.list_widgets.append(plot_widget)
+        self.plt_list.append(plot_widget)
         self.plot_container.addTab(plot_widget, conf_ui['title'])
 
     def create_logger_widget(self, log_id):
         log_widget = CustomWidgets.CustomLogger(log_id=log_id)
-        self.list_widgets.append(log_widget)
         self.log_container.addTab(log_widget, log_id)
 
 
@@ -275,12 +280,16 @@ class QThreadComm(QThread):
         self.keep_going = True
 
     def run(self):
+        msg = None
         while self.keep_going:
             try:
                 msg = self.comm.receive()
                 if msg:
                     self.signal.emit(msg)
             except Exception as err:
+                print('Error while handling msg')
+                if msg:
+                    print(msg)
                 print(err)
 
     def stop(self):
