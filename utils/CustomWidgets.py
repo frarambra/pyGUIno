@@ -1,11 +1,13 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPlainTextEdit, \
     QPushButton, QTableWidget, QHBoxLayout, QTableWidgetItem, QDialog, QComboBox, QLineEdit, QDialogButtonBox, \
     QFormLayout, QAbstractItemView, QHeaderView
-from PyQt5 import QtCore
 
+from PyQt5 import QtCore
+from utils.Forms import ErrorMessageWrapper
 import pyqtgraph as pg
 import time
 import logging
+import json
 
 
 # TODO: Avoid the y axis move that much when several pins are being plotted
@@ -46,11 +48,21 @@ class WidgetPlot(QWidget):
                 tmp_dict[pin_key] = value
                 plt_aux.update(timestamp, value, tmp_dict)
 
+    def serialize(self):
+        tmp = dict()
+        for i in range(0, len(self.contained_plots)):
+            tmp_str = self.contained_plots[i].serialize()
+            if tmp_str:
+                tmp[i] = self.contained_plots[i].serialize()
+                tmp_str = None  # just in case
+        return tmp
+
     class PltAux:
         def __init__(self, pin_key, pin_number, math_expression, color, plt_item):
             # Length must match
             self.limit = 500
-            self.t_ini = time.time()
+            self.first_update = True
+            self.t_ini = 0
             self.pin_key = pin_key
             self.pin = pin_number
             self.plt_item = plt_item
@@ -60,6 +72,10 @@ class WidgetPlot(QWidget):
             self.value_axe = []
 
         def update(self, ts, value, dict_user_ref):
+            if self.first_update:
+                self.t_ini = time.time()
+                self.first_update = False
+
             if len(self.time_axe) >= self.limit:
                 self.time_axe.pop(0)
                 self.value_axe.pop(0)
@@ -67,15 +83,26 @@ class WidgetPlot(QWidget):
             try:
                 if self.math_expression != "":
                     value = eval(self.math_expression.format_map(dict_user_ref))
-            except SystemError as err:
+            except Exception as err:
                 print('Error on eval, showing raw data')
                 print(err)
+                ErrorMessageWrapper(err.__class__, err)
             finally:
                 self.time_axe.append(ts-self.t_ini)
                 self.value_axe.append(value)
                 self.plt_item.clear()
                 self.plt_item.plot(self.time_axe, self.value_axe,
                                    pen=self.color)
+
+        def serialize(self):
+            save_dict = dict()
+            save_dict['pin_key'] = self.pin_key
+            save_dict['pin'] = self.pin
+            save_dict['math_expression'] = self.math_expression
+            save_dict['color'] = self.color
+
+            if self.pin_key and self.pin and self.math_expression and self.color:
+                return save_dict
 
 
 class CustomLogger(QWidget, logging.Handler):
@@ -94,7 +121,7 @@ class CustomLogger(QWidget, logging.Handler):
         self.loggerText.setReadOnly(True)
 
         self.title = QLabel()
-        self.title.setText(log_id+" Logger")
+        self.title.setText('Logger')
 
         self.layout().addWidget(self.title)
         self.layout().addWidget(self.loggerText)
@@ -118,7 +145,8 @@ class DebugVarsTable(QWidget):
         self.ArduinoTable.setRowCount(0)
 
         # Configure the table settings
-        self.ArduinoTable.setHorizontalHeaderLabels(['Arduino variables', 'Value', 'Address', 'Data Type'])
+        self.ArduinoTable.setHorizontalHeaderLabels(['Identificador', 'Valor',
+                                                     'Dirección', 'Tipo de dato'])
         self.ArduinoTable.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.ArduinoTable.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.ArduinoTable.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
@@ -166,7 +194,7 @@ class UserVarsTable(QWidget):
         self.UserTable.setRowCount(0)
 
         # Configure the table settings
-        self.UserTable.setHorizontalHeaderLabels(['User variables', 'Value'])
+        self.UserTable.setHorizontalHeaderLabels(['Parámetro', 'Valor'])
         self.UserTable.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.UserTable.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.UserTable.setEditTriggers(QAbstractItemView.NoEditTriggers)
@@ -177,8 +205,8 @@ class UserVarsTable(QWidget):
         # Set of buttons for UserTable, use some sort of icons, +, crank, -
         button_container = QVBoxLayout()
         button_container.setContentsMargins(0, 0, 0, 0)
-        self.add_button = QPushButton('Add')
-        self.delete_button = QPushButton('Delete')
+        self.add_button = QPushButton('Añadir')
+        self.delete_button = QPushButton('Suprimir')
 
         self.add_button.clicked.connect(self.open_add_dialog)
         self.delete_button.clicked.connect(self.delete_from_user_vars)
@@ -215,13 +243,13 @@ class UserVarsTable(QWidget):
             QDialog.__init__(self)
             self.user_table = user_table
             self.user_dict = user_dict
-
-            self.setWindowTitle(" ")
+            self.setWindowFlags(QtCore.Qt.CustomizeWindowHint | QtCore.Qt.WindowCloseButtonHint)
+            self.setWindowTitle("Añadir parámetro")
             self.setFixedWidth(300)
-            self.setFixedHeight(150)
+            self.setFixedHeight(100)
 
-            qlabel1 = QLabel("Variable name:")
-            qlabel2 = QLabel("Variable value:")
+            qlabel1 = QLabel("Nombre del parámetro:")
+            qlabel2 = QLabel("Valor del parámetro:")
 
             self.var_name = QLineEdit()
             self.var_value = QLineEdit()

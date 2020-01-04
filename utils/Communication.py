@@ -134,7 +134,7 @@ class ArduinoBoardBluetooth:
     def close(self):
         if self._is_connected:
             self.bluetooth_socket.close()
-        self._is_connected = False
+            self._is_connected = False
 
     @property
     def connected(self):

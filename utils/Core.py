@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QSizePolicy,\
-    QFrame, QToolBar, QTextEdit, QAction, QStatusBar, QErrorMessage,\
+    QFileDialog, QToolBar, QTextEdit, QAction, QStatusBar, QErrorMessage,\
     QTabWidget, QHBoxLayout, QApplication, QMainWindow, QComboBox, QSplitter
 from PyQt5.QtCore import Qt, pyqtSignal, QRect, QMetaObject, QCoreApplication, QThread
 from PyQt5.QtGui import QIcon
@@ -16,34 +16,37 @@ import sys
 class PyGUIno:
     def __init__(self):
         # Set up all the window related stuff
-        self.app = QApplication(sys.argv)
-        self.window = QMainWindow()
-        size = self.app.primaryScreen().size()
-        self.window.resize(int(size.width()*0.7),
-                           int(size.height()*0.8))
-        self.window.setObjectName("PyGUIno")
-        self.window.setWindowTitle('PyGUIno')
-        self.window.setWindowIcon(QIcon('resources\\assets\\roto2.png'))
-        self.centralwidget = QWidget(self.window)
-        self.window.setCentralWidget(self.centralwidget)
-        self.centralwidget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self._app = QApplication(sys.argv)
+        self._window = QMainWindow()
+        size = self._app.primaryScreen().size()
+        self._window.resize(int(size.width()*0.7),
+                            int(size.height()*0.8))
+        self._window.setObjectName("PyGUIno")
+        self._window.setWindowTitle('PyGUIno')
+        self._window.setWindowIcon(QIcon('resources\\assets\\etsi.png'))
+        self._centralwidget = QWidget(self._window)
+        self._window.setCentralWidget(self._centralwidget)
+        self._centralwidget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.layout = QHBoxLayout()
-        self.centralwidget.setLayout(self.layout)
+        self._centralwidget.setLayout(self.layout)
 
-        # Create actions and then toolbar
-        # TODO: add aligment
+        # Create the toolbar and the actions
         self.toolbar = QToolBar()
-        save_action = QAction(QIcon('resources\\assets\\roto2.png'), 'Save', self.window)
-        save_action.setStatusTip('Save current currents plots')
-        load_action = QAction(QIcon('resources\\assets\\roto2.png'), 'Load', self.window)
-        load_action.setStatusTip('Load plots from other projects')
-        self.connect_action = QAction(QIcon('resources\\assets\\roto2.png'), 'Connect', self.window)
-        self.connect_action.setStatusTip('Configure the connection to Arduino')
-        self.disconnect_action = QAction(QIcon('resources\\assets\\roto2.png'), 'Start', self.window)
-        self.disconnect_action.setEnabled(False)
-        self.disconnect_action.setStatusTip('Stops the Connection with Arduino')
-        add_plot = QAction(QIcon('resources\\assets\\roto2.png'), 'Add plot', self.window)
-        add_plot.setStatusTip('Adds a plot')
+        save_action = QAction(QIcon('resources\\assets\\ic_save_3x.png'), 'Guardar', self._window)
+        save_action.setStatusTip('Guarda la configuración de las gráficas actuales')
+        load_action = QAction(QIcon('resources\\assets\\ic_open_in_new_18pt_3x.png'), 'Cargar', self._window)
+        load_action.setStatusTip('Cargar la configuración de gráficas')
+        self.connect_menu = QAction(QIcon('resources\\assets\\ic_settings_black_48dp.png'), 'Conectar', self._window)
+        self.connect_menu.setStatusTip('Configuración de la conexión a Arduino')
+        self.start_action = QAction(QIcon('resources\\assets\\ic_play_arrow_3x.png'), 'Comenzar', self._window)
+        self.start_action.setEnabled(False)
+        self.start_action.setStatusTip('Comienza la conexión con Arduino')
+        self.stop_action = QAction(QIcon('resources\\assets\\ic_stop_3x.png'), 'Detener', self._window)
+        self.stop_action.setEnabled(False)
+        self.stop_action.setStatusTip('Detiene la conexión con Arduino')
+
+        add_plot = QAction(QIcon('resources\\assets\\ic_timeline_48pt_3x.png'), 'Añadir gráfica', self._window)
+        add_plot.setStatusTip('Añadir gráfica')
 
         board_selector = QComboBox()
         self.pin_dict = None
@@ -62,22 +65,24 @@ class PyGUIno:
         save_action.triggered.connect(self.save)
         load_action.triggered.connect(self.load)
         add_plot.triggered.connect(self.ini_graph_dialog)
-        self.connect_action.triggered.connect(self.connect)
-        self.disconnect_action.triggered.connect(self.stop)
+        self.connect_menu.triggered.connect(self.comm_config)
+        self.start_action.triggered.connect(self.start)
+        self.stop_action.triggered.connect(self.stop)
         board_selector.currentIndexChanged.connect(self.switch_board)
 
         self.toolbar.addAction(save_action)
         self.toolbar.addAction(load_action)
         self.toolbar.addAction(add_plot)
-        self.toolbar.addAction(self.connect_action)
-        self.toolbar.addAction(self.disconnect_action)
+        self.toolbar.addAction(self.connect_menu)
+        self.toolbar.addAction(self.start_action)
+        self.toolbar.addAction(self.stop_action)
         self.toolbar.addWidget(board_selector)
 
-        self.window.addToolBar(self.toolbar)
+        self._window.addToolBar(self.toolbar)
 
         # Create status bar
-        self.statusbar = QStatusBar(self.window)
-        self.window.setStatusBar(self.statusbar)
+        self.statusbar = QStatusBar(self._window)
+        self._window.setStatusBar(self.statusbar)
 
         # Create Workspace area
         self.widgetCoord = WidgetCoordinator()
@@ -116,25 +121,53 @@ class PyGUIno:
         self.layout.addWidget(horizontal_splitter)
         self.layout.setContentsMargins(0, 0, 0, 0)
 
-    def start(self):
-        self.window.show()
-        sys.exit(self.app.exec_())
+    def start_pygu(self):
+        self._window.show()
+        sys.exit(self._app.exec_())
 
     # Functions to trigger several menu actions
     def save(self):
-        pass
+        try:
+            some_tuple = QFileDialog.getSaveFileName(parent=None, caption='Guardar',
+                                                     directory='')
+            abs_path = some_tuple[0]
+            file = open(abs_path+'.json', 'w')
+            data_to_save = json.dumps(self.widgetCoord.save(), sort_keys=True,
+                                      indent=4, separators=(',', ': '))
+            print(data_to_save)
+            file.write(data_to_save)
+            file.close()
+        except Exception as e:
+            print(e)
 
     def load(self):
-        pass
+        try:
+            some_tuple = QFileDialog().getOpenFileName(parent=None, caption='Cargar',
+                                                       directory='')
+            abs_path = some_tuple[0]
+            raw_content = open(abs_path, 'r')
+            content = json.load(raw_content)
+            print('Content not raw anymore:')
+            print('{}'.format(content))
+            self.widgetCoord.load(content)
 
-    def connect(self):
-        Forms.ConnectionForm(self.connect_action, self.disconnect_action,
+        except Exception as e:
+            print(e)
+
+    def comm_config(self):
+        Forms.ConnectionForm(self.connect_menu, self.start_action, self.stop_action,
                              self.widgetCoord)
 
     def stop(self):
         self.widgetCoord.stop_comm()
-        self.disconnect_action.setEnabled(False)
-        self.connect_action.setEnabled(True)
+        self.connect_menu.setEnabled(True)
+        self.start_action.setEnabled(False)
+        self.stop_action.setEnabled(False)
+
+    def start(self):
+        self.widgetCoord.start_comm()
+        self.start_action.setEnabled(False)
+        self.stop_action.setEnabled(True)
 
     def ini_graph_dialog(self):
         Forms.PlotForm(self.widgetCoord, self.pin_dict,
@@ -157,12 +190,12 @@ class WidgetCoordinator:
             ["request_debug_var_value", "iI"],  # To send: type of data and memory address
             ["answer_debug_var_value", "b*"],  # To recieve: the value as an bunch of bytes
             ["arduino_transmit_debug_var", "iIsb*"]   # To recieve: type of data, memory address, human identifier
-            # and value as a bunch of bytes
+                                                      # and value as a bunch of bytes
         ]
         self.recv_thread = None
         self.comm = None
 
-        # Create layout for the widgets
+        # Create the widgets
         self.debug_vars_widget = CustomWidgets.DebugVarsTable(debug_vars=self.debug_vars)
         self.user_vars_table = CustomWidgets.UserVarsTable(user_vars=self.user_vars)
         self.plot_container = QTabWidget()
@@ -172,7 +205,7 @@ class WidgetCoordinator:
         self.plot_container.setStyleSheet('background-color:white')
         self.log_container.setStyleSheet('background-color:white')
         # Create loggers
-        logs = ['All', 'Serial', 'I2C', 'SPI']
+        logs = ['Todos', 'Serial', 'I2C', 'SPI']
         for log_id in logs:
             log = logging.getLogger(log_id)
             log.setLevel(logging.INFO)
@@ -181,8 +214,6 @@ class WidgetCoordinator:
     # Communication related methods
     def set_comm(self, comm_args):
         try:
-            print('Starting communication')
-            print('comm_args: {}'.format(comm_args))
             if comm_args['type'] == 'Serial':
                 arduino = PyCmdMessenger.ArduinoBoard(comm_args['port'], comm_args['baudrate'],
                                                       timeout=3.0, settle_time=3.0)
@@ -208,54 +239,61 @@ class WidgetCoordinator:
         self.comm = None  # To force the garbage collector
 
     def start_comm(self):
-        self.recv_thread = QThreadComm(self.comm)
-        self.recv_thread.signal.connect(self.handle_new_data)
-        self.recv_thread.start()
+        if self.comm:
+            self.recv_thread = QThreadComm(self.comm)
+            self.recv_thread.signal.connect(self.handle_new_data)
+            self.recv_thread.start()
+        else:
+            Forms.ErrorMessageWrapper('Connection Error', 'There was an error setting up the connection')
 
     def handle_new_data(self, msg):
-        input_log = logging.getLogger('All')
-        input_log.info(msg)
+        try:
+            input_log = logging.getLogger('Todos')
+            input_log.info(msg)
 
-        command = msg[0]
-        payload = msg[1]
-        ts = msg[2]
+            command = msg[0]
+            payload = msg[1]
+            ts = msg[2]
 
-        if command == self.commands[0][0]:  # ack_start
-            print("Communication started {}".format(payload))
-        elif command == self.commands[2][0]:  # arduino_transmit_pin_value
-            for widget in self.plt_list:
-                if isinstance(widget, CustomWidgets.WidgetPlot):
-                    widget.new_data(data=payload, timestamp=ts)
-        elif command == self.commands[5][0]:  # arduino_transmit_debug_var
-            row_as_dict = dict()
-            list_index = payload[0]
-            type_list = [
-                (self.comm._recv_bool, 'bool'),
-                (self.comm._recv_byte, 'byte'),
-                (self.comm._recv_char, 'char'),
-                (self.comm._recv_float, 'float'),
-                (self.comm._recv_double, 'double'),  # 8 in Arduino Due
-                (self.comm._recv_int, 'int'),  # 4 on Due, Zero...
-                (self.comm._recv_long, 'long'),
-                (self.comm._recv_int, 'short'),
-                (self.comm._recv_unsigned_int, 'unsigned int'),  # 4 on Due
-                (self.comm._recv_unsigned_int, 'unsigned short'),
-                (self.comm._recv_unsigned_long, 'unsigned long')
-            ]
-            # type of data, memory address, human identifier
-            try:
-                to_python_data = type_list[list_index][0]
-                row_as_dict['data_type'] = type_list[list_index][1]
-                row_as_dict['addr'] = payload[1]
-                row_as_dict['name'] = payload[2]
-                row_as_dict['value'] = to_python_data(bytes(payload[3:]))
-                self.debug_vars_widget.new_arduino_data(row_as_dict)
+            if command == self.commands[0][0]:  # ack_start
+                print("Comunicación establecida {}".format(payload))
+            elif command == self.commands[2][0]:  # arduino_transmit_pin_value
                 for widget in self.plt_list:
-                    if isinstance(widget, CustomWidgets.UserVarsTable):
-                        widget.new_arduino_data(row_as_dict)
-            except Exception as err:
-                Forms.ErrorMessageWrapper('Debug Variable Error',
-                                          'There was an error related to debug variables\n{}'.format(err))
+                    if isinstance(widget, CustomWidgets.WidgetPlot):
+                        widget.new_data(data=payload, timestamp=ts)
+            elif command == self.commands[5][0]:  # arduino_transmit_debug_var
+                row_as_dict = dict()
+                list_index = payload[0]
+                type_list = [
+                    (self.comm._recv_bool, 'bool'),
+                    (self.comm._recv_byte, 'byte'),
+                    (self.comm._recv_char, 'char'),
+                    (self.comm._recv_float, 'float'),
+                    (self.comm._recv_double, 'double'),  # 8 in Arduino Due
+                    (self.comm._recv_int, 'int'),  # 4 on Due, Zero...
+                    (self.comm._recv_long, 'long'),
+                    (self.comm._recv_int, 'short'),
+                    (self.comm._recv_unsigned_int, 'unsigned int'),  # 4 on Due
+                    (self.comm._recv_unsigned_int, 'unsigned short'),
+                    (self.comm._recv_unsigned_long, 'unsigned long')
+                ]
+                # type of data, memory address, human identifier
+                try:
+                    to_python_data = type_list[list_index][0]
+                    row_as_dict['data_type'] = type_list[list_index][1]
+                    row_as_dict['addr'] = payload[1]
+                    row_as_dict['name'] = payload[2]
+                    row_as_dict['value'] = to_python_data(bytes(payload[3:]))
+                    self.debug_vars_widget.new_arduino_data(row_as_dict)
+                    for widget in self.plt_list:
+                        if isinstance(widget, CustomWidgets.UserVarsTable):
+                            widget.new_arduino_data(row_as_dict)
+                except Exception as err:
+                    Forms.ErrorMessageWrapper('Error en variable de depuración',
+                                              'Ha habido un error en relacionado '
+                                              'con variables de depuracion\n{}'.format(err))
+        except Exception as e:
+            Forms.ErrorMessageWrapper(e.__class__, e)
 
     # Widget related methods
     def create_plot_widget(self, conf_ui, conf_plots):
@@ -269,6 +307,20 @@ class WidgetCoordinator:
         log_widget = CustomWidgets.CustomLogger(log_id=log_id)
         self.log_container.addTab(log_widget, log_id)
 
+    # Load and save related methods
+    def save(self):
+        conf = dict()
+        for i in range(0, len(self.plt_list)):
+            conf[i] = self.plt_list[i].serialize()
+        return conf
+
+    def load(self, content):
+        for widget_plot in content:
+            plt_aux_data = []
+            for item in widget_plot:
+                plt_aux_data.append((item['pin_key'], item['pin'], item['math_expression'], item['color']))
+            self.create_plot_widget(dict(), plt_aux_data)
+
 
 class QThreadComm(QThread):
 
@@ -277,20 +329,20 @@ class QThreadComm(QThread):
     def __init__(self, comm):
         QThread.__init__(self, parent=None)
         self.comm = comm
-        self.keep_going = True
+        self.keep_running = True
 
     def run(self):
         msg = None
-        while self.keep_going:
+        while self.keep_running:
             try:
                 msg = self.comm.receive()
                 if msg:
                     self.signal.emit(msg)
             except Exception as err:
-                print('Error while handling msg')
+                print('Error en la recepción de msg')
                 if msg:
                     print(msg)
                 print(err)
 
     def stop(self):
-        self.keep_going = False
+        self.keep_running = False

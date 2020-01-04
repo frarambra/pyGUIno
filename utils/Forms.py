@@ -7,13 +7,14 @@ import re
 
 class ConnectionForm(QtWidgets.QDialog):
     # TODO: Remove try catch
-    def __init__(self, connect_action, disconnect_action, widget_coord):
+    def __init__(self, menu_action, start_action, stop_action, widget_coord):
         try:
             QtWidgets.QDialog.__init__(self)
             self.setWindowFlags(QtCore.Qt.CustomizeWindowHint | QtCore.Qt.WindowCloseButtonHint)
             self.widgetCoord = widget_coord
-            self.disconnet_action = disconnect_action
-            self.connect_action = connect_action
+            self.stop_action = stop_action
+            self.menu_action = menu_action
+            self.start_action = start_action
             self.selected = 'Serial'  # Default value
             self.devices = dict()  # Just used on bluetooth connections
 
@@ -22,13 +23,13 @@ class ConnectionForm(QtWidgets.QDialog):
             serial_button = QtWidgets.QRadioButton('Serial')
             serial_button.setChecked(True)
             bluetooth_button = QtWidgets.QRadioButton('Bluetooth')
-            internet_button = QtWidgets.QRadioButton('Internet')
+            # internet_button = QtWidgets.QRadioButton('Internet')
             serial_button.toggled.connect(self.on_selected)
             bluetooth_button.toggled.connect(self.on_selected)
-            internet_button.toggled.connect(self.on_selected)
+            # internet_button.toggled.connect(self.on_selected)
             conn_selection_layout.addWidget(serial_button)
             conn_selection_layout.addWidget(bluetooth_button)
-            conn_selection_layout.addWidget(internet_button)
+            # conn_selection_layout.addWidget(internet_button)
 
             # Middle section for the type of connection
             self.formBox = QtWidgets.QGroupBox()
@@ -47,7 +48,7 @@ class ConnectionForm(QtWidgets.QDialog):
             # Add everything to the dialog layout
             self.formlayout = QtWidgets.QFormLayout()
             main_layout = QtWidgets.QVBoxLayout()
-            self.setWindowTitle("Connect")
+            self.setWindowTitle("Configurar conexión")
             self.formBox.setLayout(self.formlayout)
             main_layout.addLayout(conn_selection_layout)
             main_layout.addWidget(self.formBox)
@@ -55,8 +56,8 @@ class ConnectionForm(QtWidgets.QDialog):
             self.setLayout(main_layout)
 
             self.formBox.setTitle('Serial')
-            self.qlabel1.setText('Port')
-            self.qlabel2.setText('Baudrate')
+            self.qlabel1.setText('Puerto')
+            self.qlabel2.setText('Tasa de baudios')
             self.formlayout.addRow(self.qlabel1, self.i1)
             self.formlayout.addRow(self.qlabel2, self.i2)
 
@@ -90,9 +91,8 @@ class ConnectionForm(QtWidgets.QDialog):
             elif self.selected == 'Bluetooth':
                 self.devices.clear()
                 self.qlabel1 = QtWidgets.QLabel(self.formBox)
-                self.qlabel1.setText("Devices: ")
+                self.qlabel1.setText("Dispositivos: ")
                 self.pick_bluetooth = QtWidgets.QComboBox()
-                # TODO: Check if we can use asyncio to update something while waiting
                 available_devices = bluetooth.discover_devices(duration=5, lookup_names=True)
                 for addr, name in available_devices:
                     self.devices[name] = addr
@@ -133,12 +133,12 @@ class ConnectionForm(QtWidgets.QDialog):
             comm_args['port'] = self.i2.text()
 
         if self.validate_input(comm_args) and self.widgetCoord.set_comm(comm_args):
-            self.widgetCoord.start_comm()
             # Enable dc
-            self.connect_action.setEnabled(False)
-            self.disconnet_action.setEnabled(True)
+            self.menu_action.setEnabled(False)
+            self.start_action.setEnabled(True)
+            self.stop_action.setEnabled(False)
         else:
-            ErrorMessageWrapper('Connection Error', 'There was an error setting up the connection')
+            ErrorMessageWrapper('Error de conexión', 'Se produjo un error en la configuración de la conexión')
         super().accept()
 
     @staticmethod
@@ -147,8 +147,11 @@ class ConnectionForm(QtWidgets.QDialog):
             for (port, desc, hardware_id) in comports(include_links=False):
                 if comm_args['port'] == port:
                     try:
-                        int(comm_args['baudrate'])
-                        return True
+                        baud = int(comm_args['baudrate'])
+                        if baud > 0:
+                            return True
+                        else:
+                            return False
                     except ValueError:
                         return False
             return False
@@ -175,16 +178,16 @@ class PlotForm(QtWidgets.QDialog):
     def __init__(self, widget_coord, pin_dict, debug_vars):
         QtWidgets.QDialog.__init__(self)
         self.setWindowFlags(QtCore.Qt.CustomizeWindowHint | QtCore.Qt.WindowCloseButtonHint)
-        self._color_dict = {'r': 'red',
-                            'g': 'green',
-                            'b': 'blue',
-                            'c': 'cyan',  # Unsure
-                            'm': 'unknown2',
-                            'y': 'yellow',
-                            'k': 'black',
-                            'w': 'white'}
+        self._color_dict = {'r': 'Rojo',
+                            'g': 'Verde',
+                            'b': 'Azul',
+                            'c': 'Celeste',
+                            'm': 'Cian',
+                            'y': 'Amarillo',
+                            'k': 'Negro',
+                            'w': 'Blanco'}
 
-        self.setWindowTitle("Add new plot")
+        self.setWindowTitle("Añadir nueva pestaña gráfica")
         self.setMinimumWidth(400)
         self.setMinimumHeight(300)
         self.widgetCoord = widget_coord
@@ -198,15 +201,15 @@ class PlotForm(QtWidgets.QDialog):
         self.plt_dict = pin_dict_cpy
         # form Box
         formlayout = QtWidgets.QFormLayout()
-        formbox = QtWidgets.QGroupBox("General settings")
+        formbox = QtWidgets.QGroupBox("Configuración general")
         self.lineedit1 = QtWidgets.QLineEdit()
         self.lineedit1.setStatusTip('Expression to evaluate when upon recieving a pin '
                                     'value, leave blank to plot the just the pin value')
-        qlabel1 = QtWidgets.QLabel('Title')
+        qlabel1 = QtWidgets.QLabel('Titulo')
         formlayout.addRow(qlabel1, self.lineedit1)
 
-        add_button = QtWidgets.QPushButton("Add")
-        self.delete_button = QtWidgets.QPushButton("Delete")
+        add_button = QtWidgets.QPushButton("Añadir")
+        self.delete_button = QtWidgets.QPushButton("Suprimir")
         self.delete_button.setEnabled(False)
 
         # Attached functions to buttons
@@ -222,7 +225,7 @@ class PlotForm(QtWidgets.QDialog):
         self.qt_table = QtWidgets.QTableWidget()
         self.qt_table.setColumnCount(3)
         self.qt_table.setRowCount(0)
-        self.qt_table.setHorizontalHeaderLabels(['Pins', 'Eval', 'Color'])
+        self.qt_table.setHorizontalHeaderLabels(['Pin', 'Expresión', 'Color'])
         self.qt_table.horizontalHeader().setSectionResizeMode(0, QtWidgets.QHeaderView.Stretch)
         self.qt_table.horizontalHeader().setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
         self.qt_table.horizontalHeader().setSectionResizeMode(2, QtWidgets.QHeaderView.Stretch)
@@ -247,7 +250,7 @@ class PlotForm(QtWidgets.QDialog):
 
     def on_click_add(self):
         # open a PinEvalDialog
-        PinEvalDialog(self, self.plt_dict, color_dict=self._color_dict)
+        self.PinEvalDialog(self, self.plt_dict, color_dict=self._color_dict)
 
     def add_new_row(self, pin_selected, eval_string, color):
         self.delete_button.setEnabled(True)
@@ -287,51 +290,50 @@ class PlotForm(QtWidgets.QDialog):
         finally:
             super().accept()
 
+    class PinEvalDialog(QtWidgets.QDialog):
+        def __init__(self, form_to_notify, plt_dict, color_dict):
+            QtWidgets.QDialog.__init__(self)
+            self.setWindowFlags(QtCore.Qt.CustomizeWindowHint | QtCore.Qt.WindowCloseButtonHint)
+            self.setWindowTitle(" ")
+            self.setFixedWidth(300)
+            self.setFixedHeight(150)
+            self.plt_form = form_to_notify
 
-class PinEvalDialog(QtWidgets.QDialog):
-    def __init__(self, form_to_notify, plt_dict, color_dict):
-        QtWidgets.QDialog.__init__(self)
-        self.setWindowFlags(QtCore.Qt.CustomizeWindowHint | QtCore.Qt.WindowCloseButtonHint)
-        self.setWindowTitle(" ")
-        self.setFixedWidth(300)
-        self.setFixedHeight(150)
-        self.plt_form = form_to_notify
+            qlabel1 = QtWidgets.QLabel("Pin:")
+            qlabel2 = QtWidgets.QLabel("Expresión a evaluar:")
+            qlabel3 = QtWidgets.QLabel("Color:")
 
-        qlabel1 = QtWidgets.QLabel("Pin:")
-        qlabel2 = QtWidgets.QLabel("Expression to value:")
-        qlabel3 = QtWidgets.QLabel("Plot Color:")
+            self.pin_selector = QtWidgets.QComboBox()
+            for plt_id in sorted(plt_dict.keys()):
+                self.pin_selector.addItem(str(plt_id))
+            self.to_evaluate = QtWidgets.QLineEdit()
+            self.pick_color = QtWidgets.QComboBox()
+            for color in sorted(color_dict.values()):
+                self.pick_color.addItem(color)
 
-        self.pin_selector = QtWidgets.QComboBox()
-        for plt_id in sorted(plt_dict.keys()):
-            self.pin_selector.addItem(str(plt_id))
-        self.to_evaluate = QtWidgets.QLineEdit()
-        self.pick_color = QtWidgets.QComboBox()
-        for color in sorted(color_dict.values()):
-            self.pick_color.addItem(color)
+            button_box = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
+            button_box.rejected.connect(self.reject)
+            button_box.accepted.connect(self.accept)
 
-        button_box = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
-        button_box.rejected.connect(self.reject)
-        button_box.accepted.connect(self.custom_accept)
+            main_layout = QtWidgets.QVBoxLayout()
+            form_layout = QtWidgets.QFormLayout()
+            form_layout.addRow(qlabel1, self.pin_selector)
+            form_layout.addRow(qlabel2, self.to_evaluate)
+            form_layout.addRow(qlabel3, self.pick_color)
+            main_layout.addLayout(form_layout)
+            main_layout.addWidget(button_box)
+            self.setLayout(main_layout)
 
-        main_layout = QtWidgets.QVBoxLayout()
-        form_layout = QtWidgets.QFormLayout()
-        form_layout.addRow(qlabel1, self.pin_selector)
-        form_layout.addRow(qlabel2, self.to_evaluate)
-        form_layout.addRow(qlabel3, self.pick_color)
-        main_layout.addLayout(form_layout)
-        main_layout.addWidget(button_box)
-        self.setLayout(main_layout)
+            self.exec_()
 
-        self.exec_()
-
-    def custom_accept(self):
-        # Get the user input and give it to form_to_notify
-        pin_selected = self.pin_selector.currentText()
-        eval_string = self.to_evaluate.text()
-        color_selected = self.pick_color.currentText()
-        # Handle adquired data to the PlotForm object
-        self.plt_form.add_new_row(pin_selected, eval_string, color_selected)
-        super().accept()
+        def accept(self):
+            # Get the user input and give it to form_to_notify
+            pin_selected = self.pin_selector.currentText()
+            eval_string = self.to_evaluate.text()
+            color_selected = self.pick_color.currentText()
+            # Handle adquired data to the PlotForm object
+            self.plt_form.add_new_row(pin_selected, eval_string, color_selected)
+            super().accept()
 
 
 class ErrorMessageWrapper:
@@ -346,7 +348,13 @@ class ErrorMessageWrapper:
     class ErrorMessage(QtWidgets.QErrorMessage):
         def __init__(self, err_title, err_str):
             QtWidgets.QErrorMessage.__init__(self)
+            ErrorMessageWrapper.instance = self
+            self.err_title = err_title
+            self.err_str = err_str
             self.setWindowFlags(QtCore.Qt.CustomizeWindowHint | QtCore.Qt.WindowCloseButtonHint)
-            self.setWindowTitle(err_title)
-            self.showMessage(err_str)
+            self.setWindowTitle(self.err_title)
+            self.showMessage(self.err_str)
             self.exec_()
+
+        def __del__(self):
+            ErrorMessageWrapper.instance = None
