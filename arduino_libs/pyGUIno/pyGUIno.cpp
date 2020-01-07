@@ -4,10 +4,9 @@
 *
 **/
 
-#include "pyGUIno.h"
+#include "PyGUIno.h"
 #include "CmdMessenger.h"
 #include "Arduino.h"
-#include "String.h"
 
 CmdMessenger *pc_side;
 
@@ -17,7 +16,7 @@ void attach_callbacks(CmdMessenger &cmd){
 	pc_side->attach(request_pin, on_request_pin);
 	pc_side->attach(request_debug_var_value, send_debug_var_value);
 	delay(500);
-	pc_side->sendCmd(ack_start, "Arduino has booted");
+	pc_side->sendCmd(ack_start, "Arduino has booted");	
 }
 
 void transmit_pin_value(int pin){
@@ -106,3 +105,4 @@ void send_debug_var_value(){
 	//TODO: testing the function
 
 }
+

@@ -189,11 +189,15 @@ class WidgetCoordinator:
             ["arduino_transmit_pin_value", "ii"],  # To recieve: we recieve the pin and value
             ["request_debug_var_value", "iI"],  # To send: type of data and memory address
             ["answer_debug_var_value", "b*"],  # To recieve: the value as an bunch of bytes
-            ["arduino_transmit_debug_var", "iIsb*"]   # To recieve: type of data, memory address, human identifier
+            ["arduino_transmit_debug_var", "iIsb*"],  # To recieve: type of data, memory address, human identifier
                                                       # and value as a bunch of bytes
+            ["arduino_byte_read", "Ib"],  # I2C: Arduino sends read data from an addr
+            ["arduino_byte_write", "Ib*"],  # I2C: Arduino sends writen data from an addr
+            ["arduino_spi_transmit", "II"]  # SPI: Transmited value then recieved value
         ]
-        self.recv_thread = None
+        self.arduino = None
         self.comm = None
+        self.recv_thread = None
 
         # Create the widgets
         self.debug_vars_widget = CustomWidgets.DebugVarsTable(debug_vars=self.debug_vars)
@@ -205,7 +209,7 @@ class WidgetCoordinator:
         self.plot_container.setStyleSheet('background-color:white')
         self.log_container.setStyleSheet('background-color:white')
         # Create loggers
-        logs = ['Todos', 'Serial', 'I2C', 'SPI']
+        logs = ['Todos', 'I2C', 'SPI']
         for log_id in logs:
             log = logging.getLogger(log_id)
             log.setLevel(logging.INFO)
@@ -215,14 +219,14 @@ class WidgetCoordinator:
     def set_comm(self, comm_args):
         try:
             if comm_args['type'] == 'Serial':
-                arduino = PyCmdMessenger.ArduinoBoard(comm_args['port'], comm_args['baudrate'],
-                                                      timeout=3.0, settle_time=3.0)
-                self.comm = PyCmdMessenger.CmdMessenger(arduino, self.commands)
+                self.arduino = PyCmdMessenger.ArduinoBoard(comm_args['port'], comm_args['baudrate'],
+                                                           timeout=3.0, settle_time=3.0)
+                self.comm = PyCmdMessenger.CmdMessenger(self.arduino, self.commands)
             elif comm_args['type'] == 'WiFi':
                 pass
             elif comm_args['type'] == 'Bluetooth':
-                arduino = Communication.ArduinoBoardBluetooth(mac_addr=comm_args['mac_addr'])
-                self.comm = PyCmdMessenger.CmdMessenger(arduino, self.commands)
+                self.arduino = Communication.ArduinoBoardBluetooth(mac_addr=comm_args['mac_addr'])
+                self.comm = PyCmdMessenger.CmdMessenger(self.arduino, self.commands)
         except Exception as err:
             print(err.__class__)
             print(err)
@@ -248,19 +252,46 @@ class WidgetCoordinator:
 
     def handle_new_data(self, msg):
         try:
-            input_log = logging.getLogger('Todos')
-            input_log.info(msg)
 
             command = msg[0]
             payload = msg[1]
             ts = msg[2]
 
-            if command == self.commands[0][0]:  # ack_start
+            input_log = logging.getLogger('Todos')
+            input_log.info("[{:5.3f}] | {} | {} ".format(ts, command, payload))
+
+            # only arduino_byte_read, arduino_byte_write y arduino_spi_transmit
+            # needs to be send to the SPI and
+            if command == "arduino_byte_read":
+                text = "Read from {} | Value: {}".format(payload[0], hex(payload[1]))
+                input_log = logging.getLogger('I2C')
+                input_log.info(text)
+
+            elif command == "arduino_byte_write":
+                if type(payload) == type([]):
+                    payload.pop(0)
+                    hex_payload = []
+                    for x in payload:
+                        hex_payload.append(hex(x))
+                    text = "Writing value: {}".format(hex_payload)
+                else:
+                    text = "Writing value: {}".format(hex(payload))
+                input_log = logging.getLogger('I2C')
+                input_log.info(text)
+
+            elif command == "arduino_spi_transmit":
+                text = "Tx value: {} | Rx value: {}".format(hex(payload[0]), hex(payload[1]))
+                input_log = logging.getLogger('SPI')
+                input_log.info(text)
+
+            elif command == self.commands[0][0]:  # ack_start
                 print("Comunicación establecida {}".format(payload))
+
             elif command == self.commands[2][0]:  # arduino_transmit_pin_value
                 for widget in self.plt_list:
                     if isinstance(widget, CustomWidgets.WidgetPlot):
                         widget.new_data(data=payload, timestamp=ts)
+
             elif command == self.commands[5][0]:  # arduino_transmit_debug_var
                 row_as_dict = dict()
                 list_index = payload[0]
@@ -293,6 +324,7 @@ class WidgetCoordinator:
                                               'Ha habido un error en relacionado '
                                               'con variables de depuracion\n{}'.format(err))
         except Exception as e:
+            print(e)
             Forms.ErrorMessageWrapper(e.__class__, e)
 
     # Widget related methods

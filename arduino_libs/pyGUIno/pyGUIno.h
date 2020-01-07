@@ -1,14 +1,23 @@
 #include <Arduino.h>
 #include "CmdMessenger.h"
 
+//Mensajes definidos entre el ordenador y Arduino
 enum available_commands{
 	ack_start,
 	request_pin, //PC will request a pin value, it will send it the value
 	arduino_transmit_pin_value, //Arduino will transmit the pin int and the value
 	request_debug_var_value, //PC will handle memory addr and tpye of a debug var value
 	answer_debug_var_value, //Answer to the previous msg
-	arduino_transmit_debug_var //Arduino will send to the pc a debug var
+	arduino_transmit_debug_var, //Arduino will send to the pc a debug var
+	// Solo nos interesa avisar de bytes entrantes y salientes
+	arduino_byte_read_i2c,
+	//Avisa al ordenador de que se ha leido un byte junto con la direccion que lo envio
+	// addr, byte
+	arduino_byte_write_i2c
+	//Avisa al ordenador de que se envia uno o más bytes 
+	// addr, bytes
 };
+
 
 typedef enum{
 	bool_var,
@@ -44,3 +53,4 @@ void add_update_debug_var(int data, unsigned char var, const char name[]);
 void add_update_debug_var(int data, unsigned int var, const char name[]);
 void add_update_debug_var(int data, unsigned short var, const char name[]);
 void add_update_debug_var(int data, unsigned long var, const char name[]);
+

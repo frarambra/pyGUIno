@@ -1,32 +1,34 @@
 #include "Arduino.h"
 #include "CmdMessenger.h"
-#include "PyGUIno2.h"
+#include "PyGUInoWire.h"
 
 
 PyGUInoWire::PyGUInoWire(CmdMessenger &cmd){
 	this->cmd = &cmd;
+	this->cmd->sendCmd(ack_start, "Arduino has booted");	
+
 }
 
 // Metodos que me asignan los valores de los atributos
-// recv_addr y send_addr
+// write_addr y read_addr
 void PyGUInoWire::beginTransmission(int address){
-	write_addr = address;
+	write_addr = (uint16_t) address;
 	Wire.beginTransmission(address);
 }
 
 byte PyGUInoWire::requestFrom(int address, int quantity){
-	read_addr = address;
+	read_addr = (uint16_t) address;
 	return Wire.requestFrom(address, quantity);
 }
 
 byte PyGUInoWire::requestFrom(int address, int quantity, bool stop){
-	read_addr = address;
+	read_addr = (uint16_t) address;
 	return Wire.requestFrom(address, quantity, stop);
 }
 
 byte PyGUInoWire::write(byte value){
 	cmd->sendCmdStart(arduino_byte_write_i2c);
-	cmd->sendCmdBinArg<int>(write_addr);
+	cmd->sendCmdBinArg<uint16_t>(write_addr);
 	cmd->sendCmdBinArg<byte>(value);
 	cmd->sendCmdEnd();
 	return Wire.write(value);
@@ -36,7 +38,7 @@ byte PyGUInoWire::write(const char data[]){
 	
 	int i = 0;
 	cmd->sendCmdStart(arduino_byte_write_i2c);
-	cmd->sendCmdBinArg<int>(write_addr);
+	cmd->sendCmdBinArg<uint16_t>(write_addr);
 	while(data[i]!='\0'){
 		cmd->sendCmdBinArg<byte>(data[i]);
 		i++;
@@ -50,7 +52,7 @@ byte PyGUInoWire::write(byte data[], int length){
 	
 	int i = 0;
 	cmd->sendCmdStart(arduino_byte_write_i2c);
-	cmd->sendCmdBinArg<int>(write_addr);
+	cmd->sendCmdBinArg<uint16_t>(write_addr);
 	while(i<length){
 		cmd->sendCmdBinArg<byte>(data[i]);
 		i++;
@@ -65,7 +67,7 @@ byte PyGUInoWire::read(){
 	//Solo tenemos que devolver el byte leido, lo ideal sería tambien dar
 	//La direccion del periferico que lo hace
 	cmd->sendCmdStart(arduino_byte_read_i2c);
-	cmd->sendCmdBinArg<int>(write_addr);//addr
+	cmd->sendCmdBinArg<uint16_t>(write_addr);//addr
 	byte tmp = Wire.read();
 	cmd->sendCmdBinArg<byte>(tmp);		//value
 	cmd->sendCmdEnd();
@@ -78,6 +80,9 @@ void PyGUInoWire::begin(int address){
 	address ? Wire.begin(address) : Wire.begin();
 }
 
+void PyGUInoWire::begin(){
+	Wire.begin();
+}
 
 byte PyGUInoWire::endTransmission(){
 	return Wire.endTransmission();
@@ -106,6 +111,4 @@ void PyGUInoWire::SetClock(int clockFrequency){
 void PyGUInoWire::onRequest(void (*function)(void)){
 	Wire.onRequest(function);
 }
-
-
 
