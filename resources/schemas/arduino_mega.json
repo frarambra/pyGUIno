@@ -1,7 +1,7 @@
 {
-    "name": "Arduino Uno",
-    "digital": 14,
-    "analog": 6,
+    "name": "Arduino Mega 2560 Rev3",
+    "digital": 54,
+    "analog": 16,
     "data_size":{
         "int_bytes": 2,
         "long_bytes": 4,

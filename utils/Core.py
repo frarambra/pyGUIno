@@ -51,14 +51,40 @@ class PyGUIno:
         board_selector = QComboBox()
         self.pin_dict = None
         self._pin_choices = []
+        self.data_size = []
         schemas = os.listdir("resources\\schemas")
+        '''
+        {
+            "name": "Arduino Due",
+            "digital": 54,
+            "analog": 14,
+            "data_size":{
+                "int_bytes": 2,
+                "long_bytes": 4,
+                "float_bytes": 4,
+                "double_bytes": 4
+            }
+        }
+        '''
         for schema in schemas:
             fd = open("resources\\schemas\\" + schema, 'r')
             data = json.load(fd)
-            board_selector.addItem(data['meta']['ui'])
-            # Set default pin_dict to avoid None errors
-            self._pin_choices.append(data['pin'])
-            self.pin_dict = data['pin']
+            board_selector.addItem(data['name'])
+            tmp = dict()
+
+            # añadir al dict los pines digitales
+            for x in range(0, data['digital']):
+                tmp[str(x)] = x
+                pass
+
+            # añadir al dict los pines analogicos
+            for x in range(data['digital'], data['digital'] + data['analog']):
+                tmp["A"+str(x-data['digital'])] = x
+
+            # Debe añadir un dictionary a la lista
+            self._pin_choices.append(tmp)
+            self.data_size.append(data["data_size"])
+            self.pin_dict = tmp
             fd.close()
 
         # Signal handlers
@@ -86,6 +112,8 @@ class PyGUIno:
 
         # Create Workspace area
         self.widgetCoord = WidgetCoordinator()
+        self.widgetCoord.data_size = self.data_size[-1]
+
         left_layout = QVBoxLayout()
         right_layout = QVBoxLayout()
         left_layout.setContentsMargins(0, 0, 0, 0)
@@ -175,12 +203,14 @@ class PyGUIno:
 
     def switch_board(self, index):
         self.pin_dict = self._pin_choices[index]
+        self.widgetCoord.data_size = self.data_size[index]
 
 
 class WidgetCoordinator:
     def __init__(self):
         # Class attributes
         self.plt_list = []
+        self.data_size = None
         self.user_vars = dict()
         self.debug_vars = dict()
         self.commands = [
@@ -220,12 +250,20 @@ class WidgetCoordinator:
         try:
             if comm_args['type'] == 'Serial':
                 self.arduino = PyCmdMessenger.ArduinoBoard(comm_args['port'], comm_args['baudrate'],
-                                                           timeout=3.0, settle_time=3.0)
+                                                           timeout=3.0, settle_time=3.0,
+                                                           int_bytes=self.data_size['int_bytes'],
+                                                           float_bytes=self.data_size['float_bytes'],
+                                                           double_bytes=self.data_size['double_bytes'],
+                                                           long_bytes=self.data_size['long_bytes'])
                 self.comm = PyCmdMessenger.CmdMessenger(self.arduino, self.commands)
             elif comm_args['type'] == 'WiFi':
                 pass
             elif comm_args['type'] == 'Bluetooth':
-                self.arduino = Communication.ArduinoBoardBluetooth(mac_addr=comm_args['mac_addr'])
+                self.arduino = Communication.ArduinoBoardBluetooth(mac_addr=comm_args['mac_addr'],
+                                                                   int_bytes=self.data_size['int_bytes'],
+                                                                   float_bytes=self.data_size['float_bytes'],
+                                                                   double_bytes=self.data_size['double_bytes'],
+                                                                   long_bytes=self.data_size['long_bytes'])
                 self.comm = PyCmdMessenger.CmdMessenger(self.arduino, self.commands)
         except Exception as err:
             print(err.__class__)

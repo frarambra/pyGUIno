@@ -1,5 +1,5 @@
 {
-    "name": "Arduino Uno",
+    "name": "Arduino Micro",
     "digital": 14,
     "analog": 6,
     "data_size":{
