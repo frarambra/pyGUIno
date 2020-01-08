@@ -7,7 +7,6 @@ from utils.Forms import ErrorMessageWrapper
 import pyqtgraph as pg
 import time
 import logging
-import json
 
 
 # TODO: Avoid the y axis move that much when several pins are being plotted
@@ -226,7 +225,7 @@ class UserVarsTable(QWidget):
 
     def open_add_dialog(self):
         try:
-            self.AddUserVarMenu(self.UserTable, self.user_vars)
+            self.AddUserVarMenu(user_table=self)
         except Exception as err:
             print(err)
 
@@ -243,11 +242,30 @@ class UserVarsTable(QWidget):
         self._selected_row = item.row() + 1  # Shenanigan
         print('Selected row: {}'.format(self._selected_row))
 
+    def add_to_user_vars(self, key, value):
+        if key not in self.user_vars.keys():
+            # Check if it's an integer then a float
+            try:
+                float(value)
+            except ValueError as err:
+                # This aint a number, show error message
+                ErrorMessageWrapper(err, 'No es un número')
+            else:
+                # Add to dictionary and update table
+                self.user_vars[key] = value
+                append_row = self.UserTable.rowCount()
+                self.UserTable.insertRow(append_row)
+                item_name = QTableWidgetItem(key)
+                item_value = QTableWidgetItem(value)
+                self.UserTable.setItem(append_row, 0, item_name)
+                self.UserTable.setItem(append_row, 1, item_value)
+
     class AddUserVarMenu(QDialog):
-        def __init__(self, user_table, user_dict):
+        def __init__(self, user_table):
             QDialog.__init__(self)
+            if not user_table:
+                print('None de referencia')
             self.user_table = user_table
-            self.user_dict = user_dict
             self.setWindowFlags(QtCore.Qt.CustomizeWindowHint | QtCore.Qt.WindowCloseButtonHint)
             self.setWindowTitle("Añadir parámetro")
             self.setFixedWidth(300)
@@ -261,7 +279,7 @@ class UserVarsTable(QWidget):
 
             button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
             button_box.rejected.connect(self.reject)
-            button_box.accepted.connect(self.add_to_user_vars)
+            button_box.accepted.connect(self.accept)
 
             main_layout = QVBoxLayout()
             form_layout = QFormLayout()
@@ -274,26 +292,9 @@ class UserVarsTable(QWidget):
             self.show()
             self.exec_()
 
-        def add_to_user_vars(self):
+        def accept(self):
             key = self.var_name.text()
             value = self.var_value.text()
-
-            if key not in self.user_dict.keys():
-                # Check if it's an integer then a float
-                try:
-                    float(value)
-                except ValueError as err:
-                    # This aint a number, show error message
-                    print(err)
-                else:
-                    # Add to dictionary and update table
-                    self.user_dict[key] = value
-                    append_row = self.user_table.rowCount()
-                    self.user_table.insertRow(append_row)
-                    item_name = QTableWidgetItem(key)
-                    item_value = QTableWidgetItem(value)
-                    self.user_table.setItem(append_row, 0, item_name)
-                    self.user_table.setItem(append_row, 1, item_value)
-                finally:
-                    print(self.user_dict)
-                    super().accept()
+            if key and value and key != '' and value != '':
+                self.user_table.add_to_user_vars(key, value)
+            super().accept()

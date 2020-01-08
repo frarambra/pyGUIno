@@ -160,12 +160,10 @@ class PyGUIno:
             some_tuple = QFileDialog().getOpenFileName(parent=None, caption='Cargar',
                                                        directory='')
             abs_path = some_tuple[0]
-            raw_content = open(abs_path, 'r')
-            content = json.load(raw_content)
-            print('Content not raw anymore:')
-            print('{}'.format(content))
+            file = open(abs_path, 'r')
+            content = json.load(file)
             self.widgetCoord.load(content)
-
+            file.close()
         except Exception as e:
             print(e)
 
@@ -381,11 +379,22 @@ class WidgetCoordinator:
         return save_dict
 
     def load(self, content):
-        for widget_plot in content:
-            plt_aux_data = []
-            for item in widget_plot:
-                plt_aux_data.append((item['pin_key'], item['pin'], item['math_expression'], item['color']))
-            self.create_plot_widget(dict(), plt_aux_data)
+        # Primero user_dict
+        user_dict = content['user_dict']
+        for key in user_dict.keys():
+            self.user_vars_table.add_to_user_vars(key, user_dict[key])
+
+        # Ahora debemos crear los WidgetPlot
+        for widgetPlot in content['widget_plot_list']:
+            # Preparamos los pltAux que contendra
+            conf_plots = list()
+            for plt_aux in widgetPlot['pltAux_list']:
+                conf_plots.append((plt_aux['pin_key'], plt_aux['pin'],
+                                  plt_aux['math_expression'], plt_aux['color']))
+            # Preparamos el conf_ui
+            conf_ui = dict()
+            conf_ui['title'] = widgetPlot['title']
+            self.create_plot_widget(conf_ui=conf_ui, conf_plots=conf_plots)
 
 
 class QThreadComm(QThread):
