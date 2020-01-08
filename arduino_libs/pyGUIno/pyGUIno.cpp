@@ -15,7 +15,7 @@ void attach_callbacks(CmdMessenger &cmd){
 	pc_side = &cmd;
 	pc_side->attach(request_pin, on_request_pin);
 	pc_side->attach(request_debug_var_value, send_debug_var_value);
-	delay(500);
+	delay(5000);
 	pc_side->sendCmd(ack_start, "Arduino has booted");	
 }
 

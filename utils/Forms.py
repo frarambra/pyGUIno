@@ -3,8 +3,6 @@ from serial.tools.list_ports import comports
 import bluetooth
 import re
 
-import traceback
-import sys
 
 class ConnectionForm(QtWidgets.QDialog):
     # TODO: Remove try catch
@@ -177,86 +175,79 @@ class ConnectionForm(QtWidgets.QDialog):
 
 class PlotForm(QtWidgets.QDialog):
     def __init__(self, widget_coord, pin_dict, debug_vars):
-        try:
-            QtWidgets.QDialog.__init__(self)
-            self.setWindowFlags(QtCore.Qt.CustomizeWindowHint | QtCore.Qt.WindowCloseButtonHint)
-            self._color_dict = {'r': 'Rojo',
-                                'g': 'Verde',
-                                'b': 'Azul',
-                                'c': 'Celeste',
-                                'm': 'Cian',
-                                'y': 'Amarillo',
-                                'k': 'Negro',
-                                'w': 'Blanco'}
+        QtWidgets.QDialog.__init__(self)
+        self.setWindowFlags(QtCore.Qt.CustomizeWindowHint | QtCore.Qt.WindowCloseButtonHint)
+        self._color_dict = {'r': 'Rojo',
+                            'g': 'Verde',
+                            'b': 'Azul',
+                            'c': 'Celeste',
+                            'm': 'Cian',
+                            'y': 'Amarillo',
+                            'k': 'Negro',
+                            'w': 'Blanco'}
 
-            self.setWindowTitle("Añadir nueva pestaña gráfica")
-            self.setMinimumWidth(400)
-            self.setMinimumHeight(300)
-            self.widgetCoord = widget_coord
-            self.pin_dict = pin_dict
-            self.debug_vars = debug_vars
-            self._selected_row = 0
+        self.setWindowTitle("Añadir nueva pestaña gráfica")
+        self.setMinimumWidth(400)
+        self.setMinimumHeight(300)
+        self.widgetCoord = widget_coord
+        self.pin_dict = pin_dict
+        self.debug_vars = debug_vars
+        self._selected_row = 0
 
-            # Some shenanigans to identify later what can be plotted
-            pin_dict_cpy = pin_dict.copy()
-            for key in debug_vars.keys():
-                pin_dict_cpy[key] = [key]
-            self.plt_dict = pin_dict_cpy
-            # form Box
-            formlayout = QtWidgets.QFormLayout()
-            formbox = QtWidgets.QGroupBox("Configuración general")
-            self.lineedit1 = QtWidgets.QLineEdit()
-            self.lineedit1.setStatusTip('Expression to evaluate when upon recieving a pin '
-                                        'value, leave blank to plot the just the pin value')
-            qlabel1 = QtWidgets.QLabel('Titulo')
-            formlayout.addRow(qlabel1, self.lineedit1)
+        # Some shenanigans to identify later what can be plotted
+        pin_dict_cpy = pin_dict.copy()
+        for key in debug_vars.keys():
+            pin_dict_cpy[key] = [key]
+        self.plt_dict = pin_dict_cpy
+        # form Box
+        formlayout = QtWidgets.QFormLayout()
+        formbox = QtWidgets.QGroupBox("Configuración general")
+        self.lineedit1 = QtWidgets.QLineEdit()
+        self.lineedit1.setStatusTip('Expression to evaluate when upon recieving a pin '
+                                    'value, leave blank to plot the just the pin value')
+        qlabel1 = QtWidgets.QLabel('Titulo')
+        formlayout.addRow(qlabel1, self.lineedit1)
 
-            add_button = QtWidgets.QPushButton("Añadir")
-            self.delete_button = QtWidgets.QPushButton("Suprimir")
-            self.delete_button.setEnabled(False)
+        add_button = QtWidgets.QPushButton("Añadir")
+        self.delete_button = QtWidgets.QPushButton("Suprimir")
+        self.delete_button.setEnabled(False)
 
-            # Attached functions to buttons
-            # TODO: Implement deleting
-            add_button.clicked.connect(self.on_click_add)
-            self.delete_button.clicked.connect(self.delete_row)
+        # Attach functions to buttons
+        add_button.clicked.connect(self.on_click_add)
+        self.delete_button.clicked.connect(self.delete_row)
 
-            button_container = QtWidgets.QHBoxLayout()
-            button_container.addWidget(add_button)
-            button_container.addWidget(self.delete_button)
+        button_container = QtWidgets.QHBoxLayout()
+        button_container.addWidget(add_button)
+        button_container.addWidget(self.delete_button)
 
-            # A table to display the given data given on the dialog
-            # created by the add_button
-            self.qt_table = QtWidgets.QTableWidget()
-            self.qt_table.setColumnCount(3)
-            self.qt_table.setRowCount(0)
-            self.qt_table.setHorizontalHeaderLabels(['Pin', 'Expresión', 'Color'])
-            self.qt_table.horizontalHeader().setSectionResizeMode(0, QtWidgets.QHeaderView.Stretch)
-            self.qt_table.horizontalHeader().setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
-            self.qt_table.horizontalHeader().setSectionResizeMode(2, QtWidgets.QHeaderView.Stretch)
-            self.qt_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
-            self.qt_table.itemClicked.connect(self.selected_row)
+        # A table to display the given data given on the dialog
+        # created by the add_button
+        self.qt_table = QtWidgets.QTableWidget()
+        self.qt_table.setColumnCount(3)
+        self.qt_table.setRowCount(0)
+        self.qt_table.setHorizontalHeaderLabels(['Pin', 'Expresión', 'Color'])
+        self.qt_table.horizontalHeader().setSectionResizeMode(0, QtWidgets.QHeaderView.Stretch)
+        self.qt_table.horizontalHeader().setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
+        self.qt_table.horizontalHeader().setSectionResizeMode(2, QtWidgets.QHeaderView.Stretch)
+        self.qt_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.qt_table.itemClicked.connect(self.selected_row)
 
+        # ButtonBox
+        self.buttonBox = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
+        self.buttonBox.rejected.connect(self.reject)
+        self.buttonBox.accepted.connect(self.accept)
 
-            # ButtonBox
-            self.buttonBox = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
-            self.buttonBox.rejected.connect(self.reject)
-            self.buttonBox.accepted.connect(self.accept)
+        # Adding everything to the vertical layout
+        formbox.setLayout(formlayout)
+        self.mainLayout = QtWidgets.QVBoxLayout()
+        self.mainLayout.addWidget(formbox)
+        self.mainLayout.addLayout(button_container)
+        self.mainLayout.addWidget(self.qt_table)
+        self.mainLayout.addWidget(self.buttonBox)
+        self.setLayout(self.mainLayout)
 
-            # Adding everything to the vertical layout
-            formbox.setLayout(formlayout)
-            self.mainLayout = QtWidgets.QVBoxLayout()
-            self.mainLayout.addWidget(formbox)
-            self.mainLayout.addLayout(button_container)
-            self.mainLayout.addWidget(self.qt_table)
-            self.mainLayout.addWidget(self.buttonBox)
-            self.setLayout(self.mainLayout)
-
-            # Show the form
-            self.exec_()
-        except TypeError as e:
-            print(traceback.format_exception(None,  # <- type(e) by docs, but ignored
-                                             e, e.__traceback__),
-                  file=sys.stderr, flush=True)
+        # Show the form
+        self.exec_()
 
     def on_click_add(self):
         # open a PinEvalDialog

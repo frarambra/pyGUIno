@@ -36,7 +36,8 @@ class PyGUInoSPI {
 		uint8_t transfer(uint8_t value);//
 		void transfer(void *buff, size_t count); //Parece que deja en buff el dato
 		uint16_t transfer16(uint16_t value);
+		byte read();
 		void usingInterrupt(int interruptNumber);
-		
+		void setClockDivider(int clock_divider);
 		
 };

@@ -303,7 +303,7 @@ class WidgetCoordinator:
                 input_log.info(text)
 
             elif command == "arduino_spi_transmit":
-                text = "Tx value: {} | Rx value: {}".format(hex(payload[0]), hex(payload[1]))
+                text = "Tx value: 0x{:02X} | SPDR value: 0x{:02X}".format(payload[0], payload[1])
                 input_log = logging.getLogger('SPI')
                 input_log.info(text)
 

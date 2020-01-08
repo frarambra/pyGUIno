@@ -50,6 +50,19 @@ uint16_t PyGUInoSPI::transfer16(uint16_t value){
 	return tmp;
 }
 
+byte PyGUInoSPI::read(){
+	uint16_t tmp = (uint16_t) 0;
+	cmd->sendCmdStart(arduino_spi_transfer);
+	cmd->sendCmdBinArg<uint16_t>(tmp); // Tx
+	tmp = (uint16_t) SPDR;
+	cmd->sendCmdBinArg<uint16_t>(tmp);
+	cmd->sendCmdEnd();
+	
+	return tmp;
+}
+
+
+
 void PyGUInoSPI::transfer(void *buff, size_t count){
 	//A implementar
 	SPI.transfer(buff, count);
@@ -60,3 +73,6 @@ void PyGUInoSPI::usingInterrupt(int interruptNumber){
 	SPI.usingInterrupt(interruptNumber);
 }
 
+void PyGUInoSPI::setClockDivider(int clock_divider){
+	SPI.setClockDivider(clock_divider);
+}
