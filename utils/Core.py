@@ -1,9 +1,8 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QSizePolicy,\
-    QFileDialog, QToolBar, QTextEdit, QAction, QStatusBar, QErrorMessage,\
-    QTabWidget, QHBoxLayout, QApplication, QMainWindow, QComboBox, QSplitter
-from PyQt5.QtCore import Qt, pyqtSignal, QRect, QMetaObject, QCoreApplication, QThread
+    QFileDialog, QToolBar, QAction, QStatusBar, QTabWidget, \
+    QHBoxLayout, QApplication, QMainWindow, QComboBox, QSplitter
+from PyQt5.QtCore import Qt, pyqtSignal, QThread
 from PyQt5.QtGui import QIcon
-from functools import partial
 from utils import CustomWidgets, Forms, Communication
 
 import logging
@@ -53,19 +52,7 @@ class PyGUIno:
         self._pin_choices = []
         self.data_size = []
         schemas = os.listdir("resources\\schemas")
-        '''
-        {
-            "name": "Arduino Due",
-            "digital": 54,
-            "analog": 14,
-            "data_size":{
-                "int_bytes": 2,
-                "long_bytes": 4,
-                "float_bytes": 4,
-                "double_bytes": 4
-            }
-        }
-        '''
+
         for schema in schemas:
             fd = open("resources\\schemas\\" + schema, 'r')
             data = json.load(fd)
@@ -159,7 +146,7 @@ class PyGUIno:
             some_tuple = QFileDialog.getSaveFileName(parent=None, caption='Guardar',
                                                      directory='')
             abs_path = some_tuple[0]
-            file = open(abs_path+'.json', 'w')
+            file = open(abs_path, 'w')
             data_to_save = json.dumps(self.widgetCoord.save(), sort_keys=True,
                                       indent=4, separators=(',', ': '))
             print(data_to_save)
@@ -379,10 +366,19 @@ class WidgetCoordinator:
 
     # Load and save related methods
     def save(self):
-        conf = dict()
-        for i in range(0, len(self.plt_list)):
-            conf[i] = self.plt_list[i].serialize()
-        return conf
+        save_dict = dict()
+        return_list = list()
+
+        for widgetPlot in self.plt_list:
+            return_list.append(widgetPlot.serialize())
+        save_dict['user_dict'] = self.user_vars
+        save_dict['widget_plot_list'] = return_list
+
+        print('-----------------------------')
+        print(save_dict)
+        print('-----------------------------')
+
+        return save_dict
 
     def load(self, content):
         for widget_plot in content:

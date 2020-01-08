@@ -24,6 +24,7 @@ class WidgetPlot(QWidget):
         self.contained_plots = []
         self.resources = dict()
         # Set title and such from "meta"
+        self.configuration_data = configuration_data
 
         for tmp in config_plt_data:
             plt_item = self.plot_widget.getPlotItem()
@@ -49,13 +50,15 @@ class WidgetPlot(QWidget):
                 plt_aux.update(timestamp, value, tmp_dict)
 
     def serialize(self):
-        tmp = dict()
-        for i in range(0, len(self.contained_plots)):
-            tmp_str = self.contained_plots[i].serialize()
-            if tmp_str:
-                tmp[i] = self.contained_plots[i].serialize()
-                tmp_str = None  # just in case
-        return tmp
+        tmp = list()
+        for plt_aux in self.contained_plots:
+            tmp.append(plt_aux.serialize())
+
+        return_dict = dict()
+        return_dict['title'] = self.configuration_data['title']
+        return_dict['pltAux_list'] = tmp
+
+        return return_dict
 
     class PltAux:
         def __init__(self, pin_key, pin_number, math_expression, color, plt_item):
@@ -98,11 +101,13 @@ class WidgetPlot(QWidget):
             save_dict = dict()
             save_dict['pin_key'] = self.pin_key
             save_dict['pin'] = self.pin
-            save_dict['math_expression'] = self.math_expression
             save_dict['color'] = self.color
+            if self.math_expression:
+                save_dict['math_expression'] = self.math_expression
+            else:
+                save_dict['math_expression'] = ''
 
-            if self.pin_key and self.pin and self.math_expression and self.color:
-                return save_dict
+            return save_dict
 
 
 class CustomLogger(QWidget, logging.Handler):
