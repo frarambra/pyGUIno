@@ -9,50 +9,46 @@ import time
 import logging
 
 
-# TODO: Avoid the y axis move that much when several pins are being plotted
+# https://stackoverflow.com/questions/40577104/how-to-plot-two-real-time-data-in-one-single-plot-in-pyqtgraph
+
 class WidgetPlot(QWidget):
-    def __init__(self, configuration_data, config_plt_data, user_dict_ref):
+    def __init__(self, configuration_data, config_plt_data,
+                 resource_dict_ref, user_dict_ref):
         QWidget.__init__(self)
 
         pg.setConfigOption('background', 'w')
         pg.setConfigOption('foreground', 'k')
         self.setLayout(QVBoxLayout())
-        self.plot_widget = pg.PlotWidget(background='w')
-        self.layout().addWidget(self.plot_widget)
+        plot_widget = pg.PlotWidget(background='w')
+        self.layout().addWidget(plot_widget)
+        self.pltItem = plot_widget.getPlotItem()
 
         self.contained_plots = []
-        self.resources = dict()
+        self.resource_dict_ref = resource_dict_ref
+        self.user_dict_ref = user_dict_ref
         # Set title and such from "meta"
         self.configuration_data = configuration_data
 
         for tmp in config_plt_data:
-            plt_item = self.plot_widget.getPlotItem()
-            plt_aux_tmp = self.PltAux(pin_key=tmp[0], pin_number=tmp[1],
-                                      math_expression=tmp[2], color=tmp[3],
-                                      plt_item=plt_item)
-            self.resources[tmp[0]] = tmp[1]
+            plt_aux_tmp = self.PltAux(update_variable=tmp[0], math_expression=tmp[1], color=tmp[2],
+                                      plt_item=self.pltItem.plot())
             self.contained_plots.append(plt_aux_tmp)
 
-        self.user_dict_ref = user_dict_ref
-
-    # TODO: Adapt for debug variables
     def new_data(self, data, timestamp):
-        pin = data[0]
+        update_variable = data[0]
         value = data[1]
 
         for plt_aux in self.contained_plots:
-            if plt_aux.pin == pin:
-                # Get pin_id by pin_number
-                pin_key = list(self.resources.keys())[list(self.resources.values()).index(pin)]
-                tmp_dict = self.user_dict_ref.copy()
-                tmp_dict[pin_key] = value
-                plt_aux.update(timestamp, value, tmp_dict)
+            if plt_aux.update_variable == update_variable:
+                tmp = self.resource_dict_ref.copy()
+                tmp.update(self.user_dict_ref)
+                # To avoid merging the dicts
+                plt_aux.update(timestamp, value, tmp)
 
     def serialize(self):
         tmp = list()
         for plt_aux in self.contained_plots:
             tmp.append(plt_aux.serialize())
-
         return_dict = dict()
         return_dict['title'] = self.configuration_data['title']
         return_dict['pltAux_list'] = tmp
@@ -60,20 +56,19 @@ class WidgetPlot(QWidget):
         return return_dict
 
     class PltAux:
-        def __init__(self, pin_key, pin_number, math_expression, color, plt_item):
+        def __init__(self, update_variable, math_expression, color, plt_item):
             # Length must match
             self.limit = 500
             self.first_update = True
             self.t_ini = 0
-            self.pin_key = pin_key
-            self.pin = pin_number
-            self.plt_item = plt_item
+            self.update_variable = update_variable
+            self.curve = plt_item
             self.math_expression = math_expression
             self.color = color
             self.time_axe = []
             self.value_axe = []
 
-        def update(self, ts, value, dict_user_ref):
+        def update(self, ts, value, total_dict):
             if self.first_update:
                 self.t_ini = time.time()
                 self.first_update = False
@@ -84,7 +79,7 @@ class WidgetPlot(QWidget):
             # Eval and add to the axis
             try:
                 if self.math_expression != "":
-                    value = eval(self.math_expression.format_map(dict_user_ref))
+                    value = eval(self.math_expression.format_map(total_dict))
             except Exception as err:
                 print('Error on eval, showing raw data')
                 print(err)
@@ -92,14 +87,11 @@ class WidgetPlot(QWidget):
             finally:
                 self.time_axe.append(ts-self.t_ini)
                 self.value_axe.append(value)
-                self.plt_item.clear()
-                self.plt_item.plot(self.time_axe, self.value_axe,
-                                   pen=self.color)
+                self.curve.setData(self.time_axe, self.value_axe, pen=self.color)
 
         def serialize(self):
             save_dict = dict()
-            save_dict['pin_key'] = self.pin_key
-            save_dict['pin'] = self.pin
+            save_dict['update_variable'] = self.update_variable
             save_dict['color'] = self.color
             if self.math_expression:
                 save_dict['math_expression'] = self.math_expression
@@ -136,14 +128,14 @@ class CustomLogger(QWidget, logging.Handler):
 
 
 class DebugVarsTable(QWidget):
-    def __init__(self, debug_vars):
+    def __init__(self, resource_dict):
         QWidget.__init__(self, parent=None)
         self.mainLayout = QHBoxLayout()
         self.mainLayout.setContentsMargins(0, 0, 0, 0)
         self.setStyleSheet('background-color:white')
         self.ArduinoTable = QTableWidget()  # VarName | Value | Adress | Type
         self._selected_row = None
-        self.debug_vars = debug_vars
+        self.resource_dict = resource_dict
 
         self.ArduinoTable.setColumnCount(4)
         self.ArduinoTable.setRowCount(0)
@@ -181,7 +173,7 @@ class DebugVarsTable(QWidget):
         self.ArduinoTable.setItem(append_row, 3, data_type_item)
 
         # Update user_dict
-        self.debug_vars[data['name']] = data['value']
+        self.resource_dict[data['name']] = data['value']
 
 
 class UserVarsTable(QWidget):

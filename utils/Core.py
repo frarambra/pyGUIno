@@ -10,6 +10,7 @@ import PyCmdMessenger
 import os
 import json
 import sys
+import traceback
 
 
 class PyGUIno:
@@ -48,30 +49,29 @@ class PyGUIno:
         add_plot.setStatusTip('Añadir gráfica')
 
         board_selector = QComboBox()
-        self.pin_dict = None
-        self._pin_choices = []
-        self.data_size = []
+        self.board_choices = []
+        self.current_board = None
         schemas = os.listdir("resources\\schemas")
 
+        self.widgetCoord = WidgetCoordinator()
         for schema in schemas:
             fd = open("resources\\schemas\\" + schema, 'r')
             data = json.load(fd)
             board_selector.addItem(data['name'])
-            tmp = dict()
+            tmp = list()
 
             # añadir al dict los pines digitales
             for x in range(0, data['digital']):
-                tmp[str(x)] = x
-                pass
+                tmp.append(x)
 
             # añadir al dict los pines analogicos
             for x in range(data['digital'], data['digital'] + data['analog']):
-                tmp["A"+str(x-data['digital'])] = x
+                tmp.append("A"+str(x-data['digital']))
 
-            # Debe añadir un dictionary a la lista
-            self._pin_choices.append(tmp)
-            self.data_size.append(data["data_size"])
-            self.pin_dict = tmp
+            self.board_choices.append((tmp, data["data_size"]))
+            self.widgetCoord.data_size = data["data_size"]
+            self.widgetCoord.pin_list = tmp
+            self.current_board = tmp
             fd.close()
 
         # Signal handlers
@@ -98,9 +98,6 @@ class PyGUIno:
         self._window.setStatusBar(self.statusbar)
 
         # Create Workspace area
-        self.widgetCoord = WidgetCoordinator()
-        self.widgetCoord.data_size = self.data_size[-1]
-
         left_layout = QVBoxLayout()
         right_layout = QVBoxLayout()
         left_layout.setContentsMargins(0, 0, 0, 0)
@@ -183,12 +180,13 @@ class PyGUIno:
         self.stop_action.setEnabled(True)
 
     def ini_graph_dialog(self):
-        Forms.PlotForm(self.widgetCoord, self.pin_dict,
-                       self.widgetCoord.debug_vars)
+        Forms.PlotForm(self.widgetCoord, self.current_board,
+                       self.widgetCoord.resource_dict)
 
     def switch_board(self, index):
-        self.pin_dict = self._pin_choices[index]
-        self.widgetCoord.data_size = self.data_size[index]
+        self.current_board = self.board_choices[index][0]
+        self.widgetCoord.pin_list = self.board_choices[index][0]
+        self.widgetCoord.data_size = self.board_choices[index][1]
 
 
 class WidgetCoordinator:
@@ -196,8 +194,9 @@ class WidgetCoordinator:
         # Class attributes
         self.plt_list = []
         self.data_size = None
+        self.pin_list = None
         self.user_vars = dict()
-        self.debug_vars = dict()
+        self.resource_dict = dict()
         self.commands = [
             ["ack_start", "s"],  # To recieve: With this we will be aware when the communication has started
             ["request_pin", "i"],  # To send: First arg will be the number of pins to start tracking then the pin number
@@ -215,7 +214,7 @@ class WidgetCoordinator:
         self.recv_thread = None
 
         # Create the widgets
-        self.debug_vars_widget = CustomWidgets.DebugVarsTable(debug_vars=self.debug_vars)
+        self.debug_vars_widget = CustomWidgets.DebugVarsTable(resource_dict=self.resource_dict)
         self.user_vars_table = CustomWidgets.UserVarsTable(user_vars=self.user_vars)
         self.plot_container = QTabWidget()
         self.plot_container.setMinimumWidth(400)
@@ -311,9 +310,14 @@ class WidgetCoordinator:
                 print("Comunicación establecida {}".format(payload))
 
             elif command == self.commands[2][0]:  # arduino_transmit_pin_value
-                for widget in self.plt_list:
-                    if isinstance(widget, CustomWidgets.WidgetPlot):
-                        widget.new_data(data=payload, timestamp=ts)
+                # Obtener la key correspondiente para el numero y añadir valor
+                # siempre sera un dict con los pines y sus identificadores
+                index = payload[0]
+                value = payload[1]
+                key = self.pin_list[index]
+                self.resource_dict[key] = value
+                for widgetPlot in self.plt_list:
+                    widgetPlot.new_data(data=(key, value), timestamp=ts)
 
             elif command == self.commands[5][0]:  # arduino_transmit_debug_var
                 row_as_dict = dict()
@@ -339,9 +343,16 @@ class WidgetCoordinator:
                     row_as_dict['name'] = payload[2]
                     row_as_dict['value'] = to_python_data(bytes(payload[3:]))
                     self.debug_vars_widget.new_arduino_data(row_as_dict)
-                    for widget in self.plt_list:
-                        if isinstance(widget, CustomWidgets.UserVarsTable):
-                            widget.new_arduino_data(row_as_dict)
+                    self.resource_dict[payload[2]] = to_python_data(bytes(payload[3:]))
+                    for widgetPlot in self.plt_list:
+                        try:
+                            widgetPlot.new_data(data=[row_as_dict['name'], row_as_dict['value']],
+                                                timestamp=ts)
+                        except Exception as err:
+                            print(traceback.format_exception(None,  # <- type(e) by docs, but ignored
+                                                             err, err.__traceback__),
+                                  file=sys.stderr, flush=True)
+
                 except Exception as err:
                     Forms.ErrorMessageWrapper('Error en variable de depuración',
                                               'Ha habido un error en relacionado '
@@ -354,6 +365,7 @@ class WidgetCoordinator:
     def create_plot_widget(self, conf_ui, conf_plots):
         plot_widget = CustomWidgets.WidgetPlot(configuration_data=conf_ui,
                                                config_plt_data=conf_plots,
+                                               resource_dict_ref=self.resource_dict,
                                                user_dict_ref=self.user_vars)
         self.plt_list.append(plot_widget)
         self.plot_container.addTab(plot_widget, conf_ui['title'])
@@ -415,6 +427,9 @@ class QThreadComm(QThread):
                     self.signal.emit(msg)
             except Exception as err:
                 print('Error en la recepción de msg')
+                print(traceback.format_exception(None,  # <- type(e) by docs, but ignored
+                                                 err, err.__traceback__),
+                      file=sys.stderr, flush=True)
                 if msg:
                     print(msg)
                 print(err)
